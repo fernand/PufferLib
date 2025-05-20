@@ -203,20 +203,32 @@ void c_step(TDEnv *env) {
             env->rewards[i] += TD_REWARD_BUILDING_DAMAGE;
         }
     }
-    // tower damage & death
-    for (int i = 0; i < env->num_enemies; i++) {
-        struct Enemy *e = &env->enemies[i];
-        if (!e->alive) continue;
-        int dx = e->x - env->tower.x;
-        int dy = e->y - env->tower.y;
-        if (dx * dx + dy * dy <= env->tower.range * env->tower.range) {
-            if (check_los(env, env->tower.x, env->tower.y, e->x, e->y)) {
-                e->hp -= TD_TOWER_DMG;
-                if (e->hp <= 0) {
-                    e->alive = false;
-                    env->terminals[i] = 1;
-                    env->rewards[i] += TD_REWARD_DEATH;
+    // tower selects the closest in-range, line-of-sight enemy and fires once
+    {
+        int target = -1;
+        int range2 = env->tower.range * env->tower.range;
+        int best_dist2 = range2 + 1;
+        for (int i = 0; i < env->num_enemies; i++) {
+            struct Enemy *e = &env->enemies[i];
+            if (!e->alive) continue;
+            int dx = e->x - env->tower.x;
+            int dy = e->y - env->tower.y;
+            int dist2 = dx * dx + dy * dy;
+            if (dist2 <= range2
+                && check_los(env, env->tower.x, env->tower.y, e->x, e->y)) {
+                if (dist2 < best_dist2) {
+                    best_dist2 = dist2;
+                    target = i;
                 }
+            }
+        }
+        if (target >= 0) {
+            struct Enemy *e = &env->enemies[target];
+            e->hp -= TD_TOWER_DMG;
+            if (e->hp <= 0) {
+                e->alive = false;
+                env->terminals[target] = 1;
+                env->rewards[target] += TD_REWARD_DEATH;
             }
         }
     }
