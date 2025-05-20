@@ -1,0 +1,6 @@
+BasedOnStyle: Google
+PointerAlignment: Right
+SortIncludes: Never
+IndentWidth: 4
+TabWidth: 4
+ColumnLimit: 100
