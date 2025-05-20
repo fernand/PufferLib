@@ -4,9 +4,7 @@
 #include <string.h>
 #include <math.h>
 
-// Maximum number of agents included in the observation
 #define TD_MAX_AGENTS 10
-// Maximum number of towers included in the observation
 #define TD_MAX_TOWERS 5
 
 // Observation dimension:
@@ -241,7 +239,7 @@ void c_step(TDEnv *env) {
         for (int t = 0; t < TD_MAX_TOWERS; t++) {
             int off = 6 + t * 2;
             if (t == 0) {
-                obs[off]     = (float)(env->tower.x - e->x) / env->width;
+                obs[off] = (float)(env->tower.x - e->x) / env->width;
                 obs[off + 1] = (float)(env->tower.y - e->y) / env->height;
             } else {
                 obs[off] = obs[off + 1] = 0.0f;
