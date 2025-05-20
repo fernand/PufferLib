@@ -4,9 +4,15 @@
 #include <string.h>
 #include <math.h>
 
-// Observation dimension: x, y, hp_norm, building_dx, building_dy, building_hp_norm, tower_dx,
-// tower_dy
-#define TD_OBS_DIM 8
+// Maximum number of agents included in the observation
+#define TD_MAX_AGENTS 10
+
+// Observation dimension:
+// x, y, hp_norm,
+// building_dx, building_dy, building_hp_norm,
+// tower_dx, tower_dy,
+// plus all agents' relative positions (dx, dy) and health (3 features per agent)
+#define TD_OBS_DIM (8 + TD_MAX_AGENTS * 3)
 
 // Action codes
 #define TD_ACTION_NONE 0
@@ -38,6 +44,7 @@
 struct Enemy {
     int x, y;
     int hp;
+    int max_hp;
     bool alive;
 };
 struct Tower {
@@ -114,7 +121,7 @@ void init(TDEnv *env, int width, int height, int num_enemies) {
     env->building.x = width / 2;
     env->building.y = 0;
     env->building.max_hp = TD_BUILDING_HP;
-    env->building.hp = TD_BUILDING_HP;
+    env->building.hp = env->building.max_hp;
 }
 
 // Reset environment state, but do not touch RL-exposed buffers (Python manages them)
@@ -127,7 +134,9 @@ void c_reset(TDEnv *env) {
     for (int i = 0; i < env->num_enemies; i++) {
         struct Enemy *e = &env->enemies[i];
         e->alive = true;
-        e->hp = (i < env->num_enemies / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
+        // initialize HP and max HP
+        e->max_hp = (i < env->num_enemies / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
+        e->hp = e->max_hp;
         e->x = (i + 1) * env->width / (env->num_enemies + 1);
         e->y = env->height - 1;
         env->grid[e->y * env->width + e->x] =
@@ -135,6 +144,10 @@ void c_reset(TDEnv *env) {
         env->terminals[i] = 0;
     }
     memset(env->rewards, 0, env->num_enemies * sizeof(float));
+    // reset truncations buffer if provided
+    if (env->truncations) {
+        memset(env->truncations, 0, env->num_enemies * sizeof(uint8_t));
+    }
     // Observations will be filled in c_step
 }
 
@@ -217,13 +230,29 @@ void c_step(TDEnv *env) {
         }
         obs[0] = (float)e->x / (env->width - 1);
         obs[1] = (float)e->y / (env->height - 1);
-        float hp_max = (e->hp > TD_ENEMY_LOW_HP ? TD_ENEMY_HIGH_HP : TD_ENEMY_LOW_HP);
-        obs[2] = (float)e->hp / hp_max;
+        // normalized health
+        obs[2] = (float)e->hp / (float)e->max_hp;
         obs[3] = (float)(env->building.x - e->x) / env->width;
         obs[4] = (float)(env->building.y - e->y) / env->height;
         obs[5] = (float)env->building.hp / env->building.max_hp;
         obs[6] = (float)(env->tower.x - e->x) / env->width;
         obs[7] = (float)(env->tower.y - e->y) / env->height;
+        // include all agents' relative positions and normalized health
+        for (int j = 0; j < TD_MAX_AGENTS; j++) {
+            int idx_off = 8 + j * 3;
+            if (j < env->num_enemies && env->enemies[j].alive) {
+                struct Enemy *e2 = &env->enemies[j];
+                float dx = (float)(e2->x - e->x) / env->width;
+                float dy = (float)(e2->y - e->y) / env->height;
+                // normalized health of each agent
+                float hp_norm = (float)e2->hp / (float)e2->max_hp;
+                obs[idx_off]     = dx;
+                obs[idx_off + 1] = dy;
+                obs[idx_off + 2] = hp_norm;
+            } else {
+                obs[idx_off] = obs[idx_off + 1] = obs[idx_off + 2] = 0.0f;
+            }
+        }
     }
 }
 
