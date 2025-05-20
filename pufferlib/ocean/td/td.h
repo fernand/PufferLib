@@ -6,13 +6,15 @@
 
 // Maximum number of agents included in the observation
 #define TD_MAX_AGENTS 10
+// Maximum number of towers included in the observation
+#define TD_MAX_TOWERS 5
 
 // Observation dimension:
 // x, y, hp_norm,
 // building_dx, building_dy, building_hp_norm,
-// tower_dx, tower_dy,
+// tower_dx, tower_dy (for each tower, up to TD_MAX_TOWERS),
 // plus all agents' relative positions (dx, dy) and health (3 features per agent)
-#define TD_OBS_DIM (8 + TD_MAX_AGENTS * 3)
+#define TD_OBS_DIM (6 + 2 * TD_MAX_TOWERS + TD_MAX_AGENTS * 3)
 
 // Action codes
 #define TD_ACTION_NONE 0
@@ -235,18 +237,26 @@ void c_step(TDEnv *env) {
         obs[3] = (float)(env->building.x - e->x) / env->width;
         obs[4] = (float)(env->building.y - e->y) / env->height;
         obs[5] = (float)env->building.hp / env->building.max_hp;
-        obs[6] = (float)(env->tower.x - e->x) / env->width;
-        obs[7] = (float)(env->tower.y - e->y) / env->height;
+        // include towers' relative positions (dx, dy)
+        for (int t = 0; t < TD_MAX_TOWERS; t++) {
+            int off = 6 + t * 2;
+            if (t == 0) {
+                obs[off]     = (float)(env->tower.x - e->x) / env->width;
+                obs[off + 1] = (float)(env->tower.y - e->y) / env->height;
+            } else {
+                obs[off] = obs[off + 1] = 0.0f;
+            }
+        }
         // include all agents' relative positions and normalized health
         for (int j = 0; j < TD_MAX_AGENTS; j++) {
-            int idx_off = 8 + j * 3;
+            int idx_off = 6 + 2 * TD_MAX_TOWERS + j * 3;
             if (j < env->num_enemies && env->enemies[j].alive) {
                 struct Enemy *e2 = &env->enemies[j];
                 float dx = (float)(e2->x - e->x) / env->width;
                 float dy = (float)(e2->y - e->y) / env->height;
                 // normalized health of each agent
                 float hp_norm = (float)e2->hp / (float)e2->max_hp;
-                obs[idx_off]     = dx;
+                obs[idx_off] = dx;
                 obs[idx_off + 1] = dy;
                 obs[idx_off + 2] = hp_norm;
             } else {
