@@ -1,5 +1,4 @@
 #include "td.h"
-#include <stdlib.h>
 
 int main() {
     TDEnv env;
