@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "raylib.h"
+
+// Forward declaration of rendering client
+typedef struct Client Client;
 
 #define TD_MAX_AGENTS 10
 #define TD_MAX_TOWERS 5
@@ -71,6 +75,7 @@ typedef struct {
     int height;
     int num_agents;
     int tick;
+    Client *client;
 
     int *grid;  // size: width*height, holds entity codes
     struct Agents *agents;
@@ -299,4 +304,60 @@ void c_close(TDEnv *env) {
     free(env->agents);
 }
 
-void c_render(TDEnv *env) {}
+// Rendering client structure
+struct Client {
+    int px;
+};
+
+// Create rendering client (window, settings)
+Client* make_client(TDEnv *env) {
+    Client *client = (Client*)calloc(1, sizeof(Client));
+    int px = 32;
+    InitWindow(env->width * px, env->height * px, "PufferLib TD");
+    SetTargetFPS(60);
+    client->px = px;
+    return client;
+}
+
+// Close rendering client and free resources
+void close_client(Client* client) {
+    CloseWindow();
+    free(client);
+}
+
+// Render environment grid: towers, home, enemies
+void c_render(TDEnv *env) {
+    if (env->client == NULL) {
+        env->client = make_client(env);
+    }
+    if (IsKeyDown(KEY_ESCAPE)) {
+        exit(0);
+    }
+    BeginDrawing();
+    ClearBackground((Color){6, 24, 24, 255});
+    int px = env->client->px;
+    for (int i = 0; i < env->height; i++) {
+        for (int j = 0; j < env->width; j++) {
+            int code = env->grid[i * env->width + j];
+            Color color;
+            switch (code) {
+                case TD_TOWER:
+                    color = (Color){255, 0, 255, 255};
+                    break;
+                case TD_HOME:
+                    color = (Color){0, 255, 0, 255};
+                    break;
+                case TD_ENEMY_LOW:
+                    color = (Color){255, 165, 0, 255};
+                    break;
+                case TD_ENEMY_HIGH:
+                    color = (Color){255, 0, 0, 255};
+                    break;
+                default:
+                    continue;
+            }
+            DrawRectangle(j * px, i * px, px, px, color);
+        }
+    }
+    EndDrawing();
+}
