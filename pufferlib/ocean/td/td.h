@@ -347,7 +347,7 @@ void c_step(TDEnv *env) {
         }
         obs[0] = (float)e->x / (env->width - 1);
         obs[1] = (float)e->y / (env->height - 1);
-        obs[2] = (float)e->hp / (float)e->max_hp;
+        obs[2] = (float)e->hp / TD_ENEMY_HIGH_HP;
         obs[3] = (float)(env->home.x - e->x) / env->width;
         obs[4] = (float)(env->home.y - e->y) / env->height;
         obs[5] = (float)env->home.hp / env->home.max_hp;
@@ -369,7 +369,7 @@ void c_step(TDEnv *env) {
                 struct Agents *e2 = &env->agents[j];
                 float dx = (float)(e2->x - e->x) / env->width;
                 float dy = (float)(e2->y - e->y) / env->height;
-                float hp_norm = (float)e2->hp / (float)e2->max_hp;
+                float hp_norm = (float)e2->hp / TD_ENEMY_HIGH_HP;
                 obs[idx_off] = dx;
                 obs[idx_off + 1] = dy;
                 obs[idx_off + 2] = hp_norm;
