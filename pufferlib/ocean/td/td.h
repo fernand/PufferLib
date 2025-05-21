@@ -59,19 +59,19 @@ struct Building {
 // Main environment struct, matching env_binding.h expectations
 typedef struct {
     // RL-exposed buffers (set by Python, not allocated here)
-    float *observations;   // size: num_enemies * TD_OBS_DIM
-    int *actions;          // size: num_enemies
-    float *rewards;        // size: num_enemies
-    uint8_t *terminals;    // size: num_enemies
-    uint8_t *truncations;  // size: num_enemies (optional, can be NULL)
+    float *observations;   // size: num_agents * TD_OBS_DIM
+    int *actions;          // size: num_agents
+    float *rewards;        // size: num_agents
+    uint8_t *terminals;    // size: num_agents
+    uint8_t *truncations;  // size: num_agents (optional, can be NULL)
 
     // Internal state
     int width;
     int height;
-    int num_enemies;
+    int num_agents;
 
     int *grid;  // size: width*height, holds entity codes
-    struct Agents agents[TD_MAX_AGENTS];
+    struct Agents *agents;
     struct Tower towers[TD_MAX_TOWERS];
     struct Building building;
 } TDEnv;
@@ -101,12 +101,13 @@ static bool check_los(const TDEnv *env, int x0, int y0, int x1, int y1) {
 }
 
 // Called by env_init via my_init: allocates internal state and sets up env
-void init(TDEnv *env, int width, int height, int num_enemies) {
+void init(TDEnv *env, int width, int height, int num_agents) {
     env->width = width;
     env->height = height;
-    env->num_enemies = num_enemies;
+    env->num_agents = num_agents;
 
     env->grid = (int *)calloc(width * height, sizeof(int));
+    env->agents = (struct Agents*)calloc(num_agents, sizeof(struct Agents));
 
     // place first tower at center, disable others
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
@@ -140,22 +141,22 @@ void c_reset(TDEnv *env) {
     env->grid[env->building.y * env->width + env->building.x] = TD_BUILDING;
     env->building.hp = env->building.max_hp;
 
-    for (int i = 0; i < env->num_enemies; i++) {
+    for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
         e->alive = true;
         // initialize HP and max HP
-        e->max_hp = (i < env->num_enemies / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
+        e->max_hp = (i < env->num_agents / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
         e->hp = e->max_hp;
-        e->x = (i + 1) * env->width / (env->num_enemies + 1);
+        e->x = (i + 1) * env->width / (env->num_agents + 1);
         e->y = env->height - 1;
         env->grid[e->y * env->width + e->x] =
-            (i < env->num_enemies / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+            (i < env->num_agents / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
         env->terminals[i] = 0;
     }
-    memset(env->rewards, 0, env->num_enemies * sizeof(float));
+    memset(env->rewards, 0, env->num_agents * sizeof(float));
     // reset truncations buffer if provided
     if (env->truncations) {
-        memset(env->truncations, 0, env->num_enemies * sizeof(uint8_t));
+        memset(env->truncations, 0, env->num_agents * sizeof(uint8_t));
     }
     // Observations will be filled in c_step
 }
@@ -163,7 +164,7 @@ void c_reset(TDEnv *env) {
 // Step the environment by one tick. Actions are already in env->actions.
 void c_step(TDEnv *env) {
     // reset rewards
-    memset(env->rewards, 0, env->num_enemies * sizeof(float));
+    memset(env->rewards, 0, env->num_agents * sizeof(float));
     // clear grid except tower/building
     for (int i = 0; i < env->width * env->height; i++) {
         int code = env->grid[i];
@@ -171,7 +172,7 @@ void c_step(TDEnv *env) {
         env->grid[i] = TD_EMPTY;
     }
     // move enemies
-    for (int i = 0; i < env->num_enemies; i++) {
+    for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
         if (!e->alive) continue;
         int ax = e->x, ay = e->y;
@@ -195,14 +196,14 @@ void c_step(TDEnv *env) {
         e->y = clamp(ay, 0, env->height - 1);
     }
     // re-place enemies in grid
-    for (int i = 0; i < env->num_enemies; i++) {
+    for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
         if (!e->alive) continue;
         env->grid[e->y * env->width + e->x] =
             (e->hp <= TD_ENEMY_LOW_HP ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
     }
     // building damage & reward
-    for (int i = 0; i < env->num_enemies; i++) {
+    for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
         if (!e->alive) continue;
         int dx = abs(e->x - env->building.x);
@@ -219,7 +220,7 @@ void c_step(TDEnv *env) {
         int target = -1;
         int range2 = tw->range * tw->range;
         int best_dist2 = range2 + 1;
-        for (int i = 0; i < env->num_enemies; i++) {
+        for (int i = 0; i < env->num_agents; i++) {
             struct Agents *e = &env->agents[i];
             if (!e->alive) continue;
             int dx = e->x - tw->x;
@@ -243,7 +244,7 @@ void c_step(TDEnv *env) {
         }
     }
     // compute observations
-    for (int i = 0; i < env->num_enemies; i++) {
+    for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
         float *obs = &env->observations[i * TD_OBS_DIM];
         if (!e->alive) {
@@ -271,7 +272,7 @@ void c_step(TDEnv *env) {
         // include all agents' relative positions and normalized health
         for (int j = 0; j < TD_MAX_AGENTS; j++) {
             int idx_off = 6 + 2 * TD_MAX_TOWERS + j * 3;
-            if (j < env->num_enemies && env->agents[j].alive) {
+            if (j < env->num_agents && env->agents[j].alive) {
                 struct Agents *e2 = &env->agents[j];
                 float dx = (float)(e2->x - e->x) / env->width;
                 float dy = (float)(e2->y - e->y) / env->height;
