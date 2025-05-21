@@ -1,4 +1,4 @@
-#include "td.h"
+#include "tower_defense.h"
 
 #define Env TDEnv
 #include "../env_binding.h"

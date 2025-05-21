@@ -2,12 +2,12 @@ import gymnasium
 import numpy as np
 
 import pufferlib
-from pufferlib.ocean.td import binding
+from pufferlib.ocean.tower_defense import binding
 
 # Observation dimension: 6 + 2*TD_MAX_TOWERS + 3*TD_MAX_AGENTS = 46
 OBS_DIM = 6 + 2 * 5 + 3 * 10
 
-class TD(pufferlib.PufferEnv):
+class TowerDefense(pufferlib.PufferEnv):
     def __init__(self, num_envs=1, num_agents=10, width=30, height=30,
                  render_mode=None, log_interval=1, buf=None, seed=42):
         # Define native spaces
@@ -66,7 +66,7 @@ class TD(pufferlib.PufferEnv):
 if __name__ == "__main__":
     # Simple performance test
     TIME = 10
-    env = TD(num_envs=96)
+    env = TowerDefense(num_envs=96)
     actions = np.random.randint(0, env.single_action_space.n, env.num_agents)
     env.reset()
     import time

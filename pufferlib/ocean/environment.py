@@ -141,7 +141,7 @@ MAKE_FUNCTIONS = {
     'gpudrive': 'GPUDrive',
     'spaces': make_spaces,
     'multiagent': make_multiagent,
-    'td': 'TD',
+    'tower_defense': 'TowerDefense',
 }
 
 def env_creator(name='squared', *args, **kwargs):

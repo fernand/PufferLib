@@ -1,4 +1,4 @@
-#include "td.h"
+#include "tower_defense.h"
 
 int main() {
     TDEnv env;
