@@ -85,6 +85,7 @@ typedef struct {
     Client *client;
 
     int *grid;  // size: width*height, holds entity codes
+    int *prev_grid;
     struct Agents *agents;
     struct Tower towers[TD_MAX_TOWERS];
     struct Home home;
@@ -96,6 +97,7 @@ void init(TDEnv *env) {
     memset(&env->log, 0, sizeof(env->log));
 
     env->grid = (int *)calloc(env->width * env->height, sizeof(int));
+    env->prev_grid = (int *)calloc(env->width * env->height, sizeof(int));
     env->agents = (struct Agents *)calloc(env->num_agents, sizeof(struct Agents));
     env->returns = (float *)calloc(env->num_agents, sizeof(float));
 
@@ -209,21 +211,24 @@ void c_step(TDEnv *env) {
             return;
         }
     }
-    // Reset rewards
     memset(env->rewards, 0, env->num_agents * sizeof(float));
-    // Clear grid except tower/home
-    for (int i = 0; i < env->width * env->height; i++) {
-        int code = env->grid[i];
-        if (code == TD_TOWER || code == TD_HOME) continue;
-        env->grid[i] = TD_EMPTY;
+    memset(env->terminals, 0, env->num_agents * sizeof(uint8_t));
+    int total = env->width * env->height;
+    memcpy(env->prev_grid, env->grid, total * sizeof(int));
+    // Remove dead agents from grid snapshot
+    for (int j = 0; j < env->num_agents; j++) {
+        struct Agents *ea = &env->agents[j];
+        if (!ea->alive) {
+            env->prev_grid[ea->y * env->width + ea->x] = TD_EMPTY;
+        }
     }
-    // Move enemies
     int num_alive = 0;
     for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
         if (!e->alive) continue;
         num_alive++;
-        int ax = e->x, ay = e->y;
+        int old_x = e->x, old_y = e->y;
+        int ax = old_x, ay = old_y;
         switch (env->actions[i]) {
             case TD_ACTION_UP:
                 ay++;
@@ -240,19 +245,32 @@ void c_step(TDEnv *env) {
             default:
                 break;
         }
-        e->x = clamp(ax, 0, env->width - 1);
-        e->y = clamp(ay, 0, env->height - 1);
+        int nx = clamp(ax, 0, env->width - 1);
+        int ny = clamp(ay, 0, env->height - 1);
+        bool occupied = false;
+        if (nx != old_x || ny != old_y) {
+            int code = env->prev_grid[ny * env->width + nx];
+            if (code != TD_EMPTY) occupied = true;
+        }
+        if (occupied) {
+            env->rewards[i] += -0.1f;
+            env->returns[i] += -0.1f;
+            // Remain in place and mark on grid
+            int code = (e->max_hp <= TD_ENEMY_LOW_HP ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+            env->grid[old_y * env->width + old_x] = code;
+        } else {
+            // Move and update grid
+            int code = (e->max_hp <= TD_ENEMY_LOW_HP ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+            env->grid[old_y * env->width + old_x] = TD_EMPTY;
+            env->grid[ny * env->width + nx] = code;
+            e->x = nx;
+            e->y = ny;
+        }
     }
     if (num_alive == 0) {
         add_log(env);
         c_reset(env);
         return;
-    }
-    // Re-place enemies in grid
-    for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *e = &env->agents[i];
-        if (!e->alive) continue;
-        env->grid[e->y * env->width + e->x] = (e->hp <= TD_ENEMY_LOW_HP ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
     }
     // Home damage & reward
     for (int i = 0; i < env->num_agents; i++) {
@@ -364,6 +382,7 @@ void c_step(TDEnv *env) {
 
 void c_close(TDEnv *env) {
     free(env->grid);
+    free(env->prev_grid);
     free(env->agents);
 }
 
