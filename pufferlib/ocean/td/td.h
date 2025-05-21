@@ -69,7 +69,6 @@ typedef struct {
     int width;
     int height;
     int num_enemies;
-    int max_enemies;
 
     int *grid;  // size: width*height, holds entity codes
     struct Agents agents[TD_MAX_AGENTS];
@@ -105,7 +104,6 @@ static bool check_los(const TDEnv *env, int x0, int y0, int x1, int y1) {
 void init(TDEnv *env, int width, int height, int num_enemies) {
     env->width = width;
     env->height = height;
-    env->max_enemies = num_enemies;
     env->num_enemies = num_enemies;
 
     env->grid = (int *)calloc(width * height, sizeof(int));
