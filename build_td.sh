@@ -1,0 +1,1 @@
+gcc -g -O0 -Iraylib-5.5_linux_amd64/include pufferlib/ocean/td/td.c -L raylib-5.5_linux_amd64/lib -lraylib -lm -lpthread -ldl -lrt -lX11 -o td_demo
