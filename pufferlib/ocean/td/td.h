@@ -357,6 +357,23 @@ void c_render(TDEnv *env) {
                     continue;
             }
             DrawRectangle(j * px, i * px, px, px, color);
+            // Display agent HP on their rectangle
+            if (code == TD_ENEMY_LOW || code == TD_ENEMY_HIGH) {
+                for (int k = 0; k < env->num_agents; k++) {
+                    struct Agents *e = &env->agents[k];
+                    if (e->alive && e->x == j && e->y == i) {
+                        const char *hp_text = TextFormat("%d", e->hp);
+                        int fontSize = px / 2;
+                        int textWidth = MeasureText(hp_text, fontSize);
+                        DrawText(hp_text,
+                                 j * px + (px - textWidth) / 2,
+                                 i * px + (px - fontSize) / 2,
+                                 fontSize,
+                                 WHITE);
+                        break;
+                    }
+                }
+            }
         }
     }
     EndDrawing();
