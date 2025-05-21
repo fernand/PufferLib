@@ -94,7 +94,9 @@ void init(TDEnv *env, int width, int height, int num_agents) {
     env->width = width;
     env->height = height;
     env->num_agents = num_agents;
+
     env->tick = 0;
+    memset(&env->log, 0, sizeof(env->log));
 
     env->grid = (int *)calloc(width * height, sizeof(int));
     env->agents = (struct Agents *)calloc(num_agents, sizeof(struct Agents));
@@ -120,6 +122,37 @@ void init(TDEnv *env, int width, int height, int num_agents) {
     env->home.y = 0;
     env->home.max_hp = TD_HOME_HP;
     env->home.hp = env->home.max_hp;
+}
+
+// Reset environment state, but do not touch RL-exposed buffers (Python manages them)
+void c_reset(TDEnv *env) {
+    memset(env->grid, TD_EMPTY, env->width * env->height * sizeof(int));
+    // Place all towers
+    for (int t = 0; t < TD_MAX_TOWERS; t++) {
+        if (env->towers[t].range > 0) {
+            env->grid[env->towers[t].y * env->width + env->towers[t].x] = TD_TOWER;
+        }
+    }
+    env->grid[env->home.y * env->width + env->home.x] = TD_HOME;
+    env->home.hp = env->home.max_hp;
+
+    for (int i = 0; i < env->num_agents; i++) {
+        struct Agents *e = &env->agents[i];
+        e->alive = true;
+        // Initialize HP and max HP
+        e->max_hp = (i < env->num_agents / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
+        e->hp = e->max_hp;
+        e->x = (i + 1) * env->width / (env->num_agents + 1);
+        e->y = env->height - 1;
+        env->grid[e->y * env->width + e->x] = (i < env->num_agents / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+        env->terminals[i] = 0;
+    }
+    memset(env->returns, 0, env->num_agents * sizeof(float));
+    // Reset truncations buffer if provided
+    if (env->truncations) {
+        memset(env->truncations, 0, env->num_agents * sizeof(uint8_t));
+    }
+    // Observations will be filled in c_step
 }
 
 void add_log(TDEnv *env) {
@@ -154,37 +187,6 @@ static bool check_los(const TDEnv *env, int x0, int y0, int x1, int y1) {
         if (env->grid[cy * env->width + cx] != TD_EMPTY) return false;
     }
     return true;
-}
-
-// Reset environment state, but do not touch RL-exposed buffers (Python manages them)
-void c_reset(TDEnv *env) {
-    memset(env->grid, TD_EMPTY, env->width * env->height * sizeof(int));
-    // Place all towers
-    for (int t = 0; t < TD_MAX_TOWERS; t++) {
-        if (env->towers[t].range > 0) {
-            env->grid[env->towers[t].y * env->width + env->towers[t].x] = TD_TOWER;
-        }
-    }
-    env->grid[env->home.y * env->width + env->home.x] = TD_HOME;
-    env->home.hp = env->home.max_hp;
-
-    for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *e = &env->agents[i];
-        e->alive = true;
-        // Initialize HP and max HP
-        e->max_hp = (i < env->num_agents / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
-        e->hp = e->max_hp;
-        e->x = (i + 1) * env->width / (env->num_agents + 1);
-        e->y = env->height - 1;
-        env->grid[e->y * env->width + e->x] = (i < env->num_agents / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
-        env->terminals[i] = 0;
-    }
-    memset(env->rewards, 0, env->num_agents * sizeof(float));
-    // Reset truncations buffer if provided
-    if (env->truncations) {
-        memset(env->truncations, 0, env->num_agents * sizeof(uint8_t));
-    }
-    // Observations will be filled in c_step
 }
 
 // Step the environment by one tick. Actions are already in env->actions.
