@@ -75,5 +75,5 @@ if __name__ == "__main__":
     while time.time() - start < TIME:
         env.step(actions)
         steps += env.num_agents
-    print("C SPS:", steps / (time.time() - start))
+    print("C M SPS:", steps / (1e6 * (time.time() - start)))
     env.close()
