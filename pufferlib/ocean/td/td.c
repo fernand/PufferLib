@@ -34,12 +34,13 @@ int main() {
             if (!key_processed) {
                 action = new_action;
                 key_processed = true;
+                env.actions[agent_idx] = action;
                 c_step(&env);
             }
         } else {
             key_processed = false;
+            env.actions[agent_idx] = action;
         }
-        env.actions[agent_idx] = action;
 
         if (env.terminals[agent_idx]) {
             c_reset(&env);
