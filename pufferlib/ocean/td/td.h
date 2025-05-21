@@ -33,9 +33,8 @@
 #define TD_ENEMY_HIGH_HP 100
 #define TD_BUILDING_HP 100
 
-// Damage values
-#define TD_BUILDING_DMG 1  // per step when adjacent
-#define TD_TOWER_DMG 1     // per step when in range
+#define TD_UNIT_DMG 5
+#define TD_TOWER_DMG 25
 
 // Reward shaping (placeholder)
 #define TD_REWARD_BUILDING_DAMAGE 1.0f
@@ -72,7 +71,7 @@ typedef struct {
     int num_enemies;
     int max_enemies;
 
-    int *grid;              // size: width*height, holds entity codes
+    int *grid;  // size: width*height, holds entity codes
     struct Agents agents[TD_MAX_AGENTS];
     struct Tower towers[TD_MAX_TOWERS];
     struct Building building;
@@ -211,7 +210,7 @@ void c_step(TDEnv *env) {
         int dx = abs(e->x - env->building.x);
         int dy = abs(e->y - env->building.y);
         if (dx + dy == 1) {
-            env->building.hp -= TD_BUILDING_DMG;
+            env->building.hp -= TD_UNIT_DMG;
             env->rewards[i] += TD_REWARD_BUILDING_DAMAGE;
         }
     }
@@ -228,8 +227,7 @@ void c_step(TDEnv *env) {
             int dx = e->x - tw->x;
             int dy = e->y - tw->y;
             int dist2 = dx * dx + dy * dy;
-            if (dist2 <= range2
-                && check_los(env, tw->x, tw->y, e->x, e->y)) {
+            if (dist2 <= range2 && check_los(env, tw->x, tw->y, e->x, e->y)) {
                 if (dist2 < best_dist2) {
                     best_dist2 = dist2;
                     target = i;
