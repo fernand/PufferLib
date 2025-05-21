@@ -65,7 +65,6 @@ struct Log {
     float n;
 };
 
-// Main environment struct, matching env_binding.h expectations
 typedef struct {
     // RL-exposed buffers (set by Python, not allocated here)
     float *observations;   // size: num_agents * TD_OBS_DIM
@@ -386,7 +385,6 @@ void c_close(TDEnv *env) {
     free(env->agents);
 }
 
-// Rendering client structure
 struct Client {
     int px;
 };
@@ -401,13 +399,11 @@ Client *make_client(TDEnv *env) {
     return client;
 }
 
-// Close rendering client and free resources
 void close_client(Client *client) {
     CloseWindow();
     free(client);
 }
 
-// Render environment grid: towers, home, enemies
 void c_render(TDEnv *env) {
     if (env->client == NULL) {
         env->client = make_client(env);
