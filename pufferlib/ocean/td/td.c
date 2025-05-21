@@ -49,12 +49,5 @@ int main() {
         c_render(&env);
     }
 
-    free(env.observations);
-    free(env.actions);
-    free(env.rewards);
-    free(env.terminals);
-    free(env.truncations);
-    close_client(env.client);
-    c_close(&env);
     return 0;
 }
