@@ -75,6 +75,7 @@ typedef struct {
     uint8_t *terminals;    // size: num_agents
     uint8_t *truncations;  // size: num_agents (optional, can be NULL)
 
+    // Set by my_init() in binding.c
     int width;
     int height;
     int num_agents;
@@ -90,24 +91,20 @@ typedef struct {
 } TDEnv;
 
 // Called by env_init via my_init: allocates internal state and sets up env
-void init(TDEnv *env, int width, int height, int num_agents) {
-    env->width = width;
-    env->height = height;
-    env->num_agents = num_agents;
-
+void init(TDEnv *env) {
     env->tick = 0;
     memset(&env->log, 0, sizeof(env->log));
 
-    env->grid = (int *)calloc(width * height, sizeof(int));
-    env->agents = (struct Agents *)calloc(num_agents, sizeof(struct Agents));
-    env->returns = (float *)calloc(num_agents, sizeof(float));
+    env->grid = (int *)calloc(env->width * env->height, sizeof(int));
+    env->agents = (struct Agents *)calloc(env->num_agents, sizeof(struct Agents));
+    env->returns = (float *)calloc(env->num_agents, sizeof(float));
 
     // Place first tower at center, disable others
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
         if (t == 0) {
-            env->towers[t].x = width / 2;
-            env->towers[t].y = height / 2;
-            env->towers[t].range = (width < height ? width : height) / 4;
+            env->towers[t].x = env->width / 2;
+            env->towers[t].y = env->height / 2;
+            env->towers[t].range = (env->width < env->height ? env->width : env->height) / 4;
             env->towers[t].last_fired = -3;
         } else {
             env->towers[t].x = 0;
@@ -118,7 +115,7 @@ void init(TDEnv *env, int width, int height, int num_agents) {
     }
 
     // Place home at bottom center
-    env->home.x = width / 2;
+    env->home.x = env->width / 2;
     env->home.y = 0;
     env->home.max_hp = TD_HOME_HP;
     env->home.hp = env->home.max_hp;

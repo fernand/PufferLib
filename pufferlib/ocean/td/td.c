@@ -2,18 +2,17 @@
 #include <stdlib.h>
 
 int main() {
-    int width = 30;
-    int height = 30;
-    int num_agents = 10;
-
     TDEnv env;
-    init(&env, width, height, num_agents);
+    env.width = 30;
+    env.height = 30;
+    env.num_agents = 10;
+    init(&env);
 
-    env.observations = (float *)calloc(num_agents * TD_OBS_DIM, sizeof(float));
-    env.actions = (int *)calloc(num_agents, sizeof(int));
-    env.rewards = (float *)calloc(num_agents, sizeof(float));
-    env.terminals = (uint8_t *)calloc(num_agents, sizeof(uint8_t));
-    env.truncations = (uint8_t *)calloc(num_agents, sizeof(uint8_t));
+    env.observations = (float *)calloc(env.num_agents * TD_OBS_DIM, sizeof(float));
+    env.actions = (int *)calloc(env.num_agents, sizeof(int));
+    env.rewards = (float *)calloc(env.num_agents, sizeof(float));
+    env.terminals = (uint8_t *)calloc(env.num_agents, sizeof(uint8_t));
+    env.truncations = (uint8_t *)calloc(env.num_agents, sizeof(uint8_t));
 
     env.client = make_client(&env);
 
