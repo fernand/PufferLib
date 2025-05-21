@@ -66,14 +66,14 @@ class TD(pufferlib.PufferEnv):
 if __name__ == "__main__":
     # Simple performance test
     TIME = 10
-    env = TD(num_envs=512)
+    env = TD(num_envs=96)
     actions = np.random.randint(0, env.single_action_space.n, env.num_agents)
     env.reset()
     import time
     steps = 0
-    start = time.time()
-    while time.time() - start < TIME:
+    start = time.perf_counter()
+    while time.perf_counter() - start < TIME:
         env.step(actions)
         steps += env.num_agents
-    print("C M SPS:", steps / (1e6 * (time.time() - start)))
+    print("C M SPS:", steps / (1e6 * (time.perf_counter() - start)))
     env.close()
