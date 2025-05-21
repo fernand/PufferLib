@@ -70,8 +70,7 @@ typedef struct {
     int width;
     int height;
     int num_agents;
-    // Current step idx
-    int step;
+    int tick;
 
     int *grid;  // size: width*height, holds entity codes
     struct Agents *agents;
@@ -108,6 +107,7 @@ void init(TDEnv *env, int width, int height, int num_agents) {
     env->width = width;
     env->height = height;
     env->num_agents = num_agents;
+    env->tick = 0;
 
     env->grid = (int *)calloc(width * height, sizeof(int));
     env->agents = (struct Agents *)calloc(num_agents, sizeof(struct Agents));
@@ -168,6 +168,7 @@ void c_reset(TDEnv *env) {
 
 // Step the environment by one tick. Actions are already in env->actions.
 void c_step(TDEnv *env) {
+    env->tick++;
     // Reset rewards
     memset(env->rewards, 0, env->num_agents * sizeof(float));
     // Clear grid except tower/home
@@ -222,7 +223,7 @@ void c_step(TDEnv *env) {
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
         struct Tower *tw = &env->towers[t];
         if (tw->range <= 0) continue;
-        if (env->step - tw->last_fired < TD_TOWER_FIRE_RATE) continue;
+        if (env->tick - tw->last_fired < TD_TOWER_FIRE_RATE) continue;
         int target = -1;
         int range2 = tw->range * tw->range;
         int best_dist2 = range2 + 1;
@@ -240,7 +241,7 @@ void c_step(TDEnv *env) {
             }
         }
         if (target >= 0) {
-            tw->last_fired = env->step;
+            tw->last_fired = env->tick;
             struct Agents *e = &env->agents[target];
             e->hp -= TD_TOWER_DMG;
             if (e->hp <= 0) {
@@ -291,7 +292,6 @@ void c_step(TDEnv *env) {
             }
         }
     }
-    env->step++;
 }
 
 void c_close(TDEnv *env) {
