@@ -98,7 +98,7 @@ void init(TDEnv *env, int width, int height, int num_agents) {
 
     env->grid = (int *)calloc(width * height, sizeof(int));
     env->agents = (struct Agents *)calloc(num_agents, sizeof(struct Agents));
-    env->returns = (float*)calloc(num_agents, sizeof(float));
+    env->returns = (float *)calloc(num_agents, sizeof(float));
 
     // Place first tower at center, disable others
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
@@ -176,8 +176,7 @@ void c_reset(TDEnv *env) {
         e->hp = e->max_hp;
         e->x = (i + 1) * env->width / (env->num_agents + 1);
         e->y = env->height - 1;
-        env->grid[e->y * env->width + e->x] =
-            (i < env->num_agents / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+        env->grid[e->y * env->width + e->x] = (i < env->num_agents / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
         env->terminals[i] = 0;
     }
     memset(env->rewards, 0, env->num_agents * sizeof(float));
@@ -194,8 +193,8 @@ void c_step(TDEnv *env) {
     if (env->tick > MAX_TICK) {
         for (int i = 0; i < env->num_agents; i++) {
             env->terminals[i] = 1;
-            env->returns[i] -= 1.0f;
-            env->rewards[i] = -1.0f;
+            env->returns[i] += -1.0f;
+            env->rewards[i] += -1.0f;
             add_log(env);
             c_reset(env);
             return;
@@ -205,7 +204,7 @@ void c_step(TDEnv *env) {
         for (int i = 0; i < env->num_agents; i++) {
             env->terminals[i] = 1;
             env->returns[i] += 1.0f;
-            env->rewards[i] = 1.0f;
+            env->rewards[i] += 1.0f;
             add_log(env);
             c_reset(env);
             return;
@@ -254,8 +253,7 @@ void c_step(TDEnv *env) {
     for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
         if (!e->alive) continue;
-        env->grid[e->y * env->width + e->x] =
-            (e->hp <= TD_ENEMY_LOW_HP ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+        env->grid[e->y * env->width + e->x] = (e->hp <= TD_ENEMY_LOW_HP ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
     }
     // Home damage & reward
     for (int i = 0; i < env->num_agents; i++) {
@@ -266,7 +264,7 @@ void c_step(TDEnv *env) {
         if (dx + dy == 1) {
             env->home.hp -= TD_AGENT_DMG;
             env->returns[i] += 0.1f;
-            env->rewards[i] = 0.1f;
+            env->rewards[i] += 0.1f;
         }
     }
     // Towers each select their closest in-range, line-of-sight enemy and fire once
@@ -297,9 +295,29 @@ void c_step(TDEnv *env) {
             if (e->hp <= 0) {
                 e->alive = false;
                 env->terminals[target] = 1;
-                env->returns[target] -= 1.0f;
-                env->rewards[target] = 1.0f;
+                env->returns[target] += -1.0f;
+                env->rewards[target] += -1.0f;
             }
+        }
+    }
+    // Distance-based shaping reward: proportional to proximity to home
+    {
+        int max_dx = env->home.x > (env->width - 1 - env->home.x) ? env->home.x : (env->width - 1 - env->home.x);
+        int max_dy = env->home.y > (env->height - 1 - env->home.y) ? env->home.y : (env->height - 1 - env->home.y);
+        int max_dist = max_dx + max_dy;
+        int denom = max_dist > 1 ? (max_dist - 1) : 1;
+        for (int i = 0; i < env->num_agents; i++) {
+            struct Agents *e = &env->agents[i];
+            if (!e->alive) continue;
+            int dx = abs(e->x - env->home.x);
+            int dy = abs(e->y - env->home.y);
+            int dist = dx + dy;
+            float shaping = ((float)(max_dist - dist) / (float)denom) * 0.2f;
+            if (dist <= 1) shaping = 0.2f;
+            if (shaping < 0.0f) shaping = 0.0f;
+            if (shaping > 0.2f) shaping = 0.2f;
+            env->rewards[i] += shaping;
+            env->returns[i] += shaping;
         }
     }
     // Compute observations
@@ -411,8 +429,7 @@ void c_render(TDEnv *env) {
                         const char *hp_text = TextFormat("%d", e->hp);
                         int fontSize = px / 2;
                         int textWidth = MeasureText(hp_text, fontSize);
-                        DrawText(hp_text, j * px + (px - textWidth) / 2,
-                                 i * px + (px - fontSize) / 2, fontSize, WHITE);
+                        DrawText(hp_text, j * px + (px - textWidth) / 2, i * px + (px - fontSize) / 2, fontSize, WHITE);
                         break;
                     }
                 }
