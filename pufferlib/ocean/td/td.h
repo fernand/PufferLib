@@ -10,6 +10,7 @@ typedef struct Client Client;
 
 #define TD_MAX_AGENTS 10
 #define TD_MAX_TOWERS 5
+#define MAX_TICK 50
 
 // Observation dimension:
 // x, y, hp_norm,
@@ -18,21 +19,18 @@ typedef struct Client Client;
 // plus all agents' relative positions (dx, dy) and health (3 features per agent)
 #define TD_OBS_DIM (6 + 2 * TD_MAX_TOWERS + TD_MAX_AGENTS * 3)
 
-// Action codes
 #define TD_ACTION_NONE 0
 #define TD_ACTION_UP 1
 #define TD_ACTION_DOWN 2
 #define TD_ACTION_LEFT 3
 #define TD_ACTION_RIGHT 4
 
-// Entity types for grid (optional, for LOS checks)
 #define TD_EMPTY 0
 #define TD_TOWER 1
 #define TD_HOME 2
 #define TD_ENEMY_LOW 3
 #define TD_ENEMY_HIGH 4
 
-// HP values
 #define TD_ENEMY_LOW_HP 25
 #define TD_ENEMY_HIGH_HP 100
 #define TD_HOME_HP 100
@@ -40,10 +38,6 @@ typedef struct Client Client;
 #define TD_AGENT_DMG 5
 #define TD_TOWER_DMG 25
 #define TD_TOWER_FIRE_RATE 3
-
-// Reward shaping (placeholder)
-#define TD_REWARD_HOME_DAMAGE 1.0f
-#define TD_REWARD_DEATH -1.0f
 
 struct Agents {
     int x, y;
@@ -62,19 +56,31 @@ struct Home {
     int max_hp;
 };
 
+typedef struct Log Log;
+struct Log {
+    float perf;
+    float score;
+    float episode_return;
+    float episode_length;
+    float n;
+};
+
 // Main environment struct, matching env_binding.h expectations
 typedef struct {
     // RL-exposed buffers (set by Python, not allocated here)
     float *observations;   // size: num_agents * TD_OBS_DIM
     int *actions;          // size: num_agents
     float *rewards;        // size: num_agents
+    float *returns;        // size: num_agents
     uint8_t *terminals;    // size: num_agents
     uint8_t *truncations;  // size: num_agents (optional, can be NULL)
 
     int width;
     int height;
     int num_agents;
+
     int tick;
+    Log log;
     Client *client;
 
     int *grid;  // size: width*height, holds entity codes
@@ -82,6 +88,49 @@ typedef struct {
     struct Tower towers[TD_MAX_TOWERS];
     struct Home home;
 } TDEnv;
+
+// Called by env_init via my_init: allocates internal state and sets up env
+void init(TDEnv *env, int width, int height, int num_agents) {
+    env->width = width;
+    env->height = height;
+    env->num_agents = num_agents;
+    env->tick = 0;
+
+    env->grid = (int *)calloc(width * height, sizeof(int));
+    env->agents = (struct Agents *)calloc(num_agents, sizeof(struct Agents));
+    env->returns = (float*)calloc(num_agents, sizeof(float));
+
+    // Place first tower at center, disable others
+    for (int t = 0; t < TD_MAX_TOWERS; t++) {
+        if (t == 0) {
+            env->towers[t].x = width / 2;
+            env->towers[t].y = height / 2;
+            env->towers[t].range = (width < height ? width : height) / 4;
+            env->towers[t].last_fired = -3;
+        } else {
+            env->towers[t].x = 0;
+            env->towers[t].y = 0;
+            env->towers[t].range = 0;
+            env->towers[t].last_fired = -1;
+        }
+    }
+
+    // Place home at bottom center
+    env->home.x = width / 2;
+    env->home.y = 0;
+    env->home.max_hp = TD_HOME_HP;
+    env->home.hp = env->home.max_hp;
+}
+
+void add_log(TDEnv *env) {
+    for (int i = 0; i < env->num_agents; i++) {
+        env->log.perf += env->rewards[i];
+        env->log.score += env->returns[i];
+        env->log.episode_length += env->tick;
+        env->log.episode_return += env->returns[i];
+        env->log.n++;
+    }
+}
 
 static inline int clamp(int v, int mn, int mx) { return v < mn ? mn : (v > mx ? mx : v); }
 
@@ -105,38 +154,6 @@ static bool check_los(const TDEnv *env, int x0, int y0, int x1, int y1) {
         if (env->grid[cy * env->width + cx] != TD_EMPTY) return false;
     }
     return true;
-}
-
-// Called by env_init via my_init: allocates internal state and sets up env
-void init(TDEnv *env, int width, int height, int num_agents) {
-    env->width = width;
-    env->height = height;
-    env->num_agents = num_agents;
-    env->tick = 0;
-
-    env->grid = (int *)calloc(width * height, sizeof(int));
-    env->agents = (struct Agents *)calloc(num_agents, sizeof(struct Agents));
-
-    // Place first tower at center, disable others
-    for (int t = 0; t < TD_MAX_TOWERS; t++) {
-        if (t == 0) {
-            env->towers[t].x = width / 2;
-            env->towers[t].y = height / 2;
-            env->towers[t].range = (width < height ? width : height) / 4;
-            env->towers[t].last_fired = -3;
-        } else {
-            env->towers[t].x = 0;
-            env->towers[t].y = 0;
-            env->towers[t].range = 0;
-            env->towers[t].last_fired = -1;
-        }
-    }
-
-    // Place home at bottom center
-    env->home.x = width / 2;
-    env->home.y = 0;
-    env->home.max_hp = TD_HOME_HP;
-    env->home.hp = env->home.max_hp;
 }
 
 // Reset environment state, but do not touch RL-exposed buffers (Python manages them)
@@ -174,6 +191,26 @@ void c_reset(TDEnv *env) {
 // Step the environment by one tick. Actions are already in env->actions.
 void c_step(TDEnv *env) {
     env->tick++;
+    if (env->tick > MAX_TICK) {
+        for (int i = 0; i < env->num_agents; i++) {
+            env->terminals[i] = 1;
+            env->returns[i] -= 1.0f;
+            env->rewards[i] = -1.0f;
+            add_log(env);
+            c_reset(env);
+            return;
+        }
+    }
+    if (env->home.hp <= 0) {
+        for (int i = 0; i < env->num_agents; i++) {
+            env->terminals[i] = 1;
+            env->returns[i] += 1.0f;
+            env->rewards[i] = 1.0f;
+            add_log(env);
+            c_reset(env);
+            return;
+        }
+    }
     // Reset rewards
     memset(env->rewards, 0, env->num_agents * sizeof(float));
     // Clear grid except tower/home
@@ -183,9 +220,11 @@ void c_step(TDEnv *env) {
         env->grid[i] = TD_EMPTY;
     }
     // Move enemies
+    int num_alive = 0;
     for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
         if (!e->alive) continue;
+        num_alive++;
         int ax = e->x, ay = e->y;
         switch (env->actions[i]) {
             case TD_ACTION_UP:
@@ -206,6 +245,11 @@ void c_step(TDEnv *env) {
         e->x = clamp(ax, 0, env->width - 1);
         e->y = clamp(ay, 0, env->height - 1);
     }
+    if (num_alive == 0) {
+        add_log(env);
+        c_reset(env);
+        return;
+    }
     // Re-place enemies in grid
     for (int i = 0; i < env->num_agents; i++) {
         struct Agents *e = &env->agents[i];
@@ -221,7 +265,8 @@ void c_step(TDEnv *env) {
         int dy = abs(e->y - env->home.y);
         if (dx + dy == 1) {
             env->home.hp -= TD_AGENT_DMG;
-            env->rewards[i] += TD_REWARD_HOME_DAMAGE;
+            env->returns[i] += 0.1f;
+            env->rewards[i] = 0.1f;
         }
     }
     // Towers each select their closest in-range, line-of-sight enemy and fire once
@@ -252,7 +297,8 @@ void c_step(TDEnv *env) {
             if (e->hp <= 0) {
                 e->alive = false;
                 env->terminals[target] = 1;
-                env->rewards[target] += TD_REWARD_DEATH;
+                env->returns[target] -= 1.0f;
+                env->rewards[target] = 1.0f;
             }
         }
     }
@@ -310,8 +356,8 @@ struct Client {
 };
 
 // Create rendering client (window, settings)
-Client* make_client(TDEnv *env) {
-    Client *client = (Client*)calloc(1, sizeof(Client));
+Client *make_client(TDEnv *env) {
+    Client *client = (Client *)calloc(1, sizeof(Client));
     int px = 32;
     InitWindow(env->width * px, env->height * px, "PufferLib TD");
     SetTargetFPS(60);
@@ -320,7 +366,7 @@ Client* make_client(TDEnv *env) {
 }
 
 // Close rendering client and free resources
-void close_client(Client* client) {
+void close_client(Client *client) {
     CloseWindow();
     free(client);
 }
@@ -365,11 +411,8 @@ void c_render(TDEnv *env) {
                         const char *hp_text = TextFormat("%d", e->hp);
                         int fontSize = px / 2;
                         int textWidth = MeasureText(hp_text, fontSize);
-                        DrawText(hp_text,
-                                 j * px + (px - textWidth) / 2,
-                                 i * px + (px - fontSize) / 2,
-                                 fontSize,
-                                 WHITE);
+                        DrawText(hp_text, j * px + (px - textWidth) / 2,
+                                 i * px + (px - fontSize) / 2, fontSize, WHITE);
                         break;
                     }
                 }
