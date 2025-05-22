@@ -110,12 +110,12 @@ class TowerDefense(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
         )
-        # 4 * cnn_channels == hidden_size
         self.proj = nn.Sequential(
             pufferlib.pytorch.layer_init(nn.Linear(hidden_size, hidden_size)),
             nn.ReLU(),
         )
-        self.actor = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, 5), std=0.01)
+        self.num_actions = env.single_action_space.n
+        self.actor = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, self.num_actions), std=0.01)
         self.value = pufferlib.pytorch.layer_init(
                 nn.Linear(hidden_size, 1), std=1)
 
@@ -134,8 +134,7 @@ class TowerDefense(nn.Module):
 
     def decode_actions(self, hidden):
         action = self.actor(hidden)
-        print(action.shape)
-        action = torch.split(action, 5, dim=1)
+        action = torch.split(action, self.num_actions, dim=1)
         value = self.value(hidden)
         return action, value
 
