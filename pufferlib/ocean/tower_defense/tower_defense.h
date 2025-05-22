@@ -129,9 +129,9 @@ static void compute_observations(TDEnv *env) {
             int x = idx % w;
             int y = idx / w;
             for (int j = 0; j < env->num_agents; j++) {
-                struct Agents *e2 = &env->agents[j];
-                if (e2->alive && e2->x == x && e2->y == y) {
-                    v = (float)e2->hp / (float)TD_ENEMY_HIGH_HP;
+                struct Agents *a2 = &env->agents[j];
+                if (a2->alive && a2->x == x && a2->y == y) {
+                    v = (float)a2->hp / (float)TD_ENEMY_HIGH_HP;
                     break;
                 }
             }
