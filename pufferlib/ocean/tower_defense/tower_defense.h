@@ -29,7 +29,7 @@ typedef struct Client Client;
 #define TD_HOME_HP 100
 
 #define TD_AGENT_DMG 5
-#define TD_TOWER_DMG 15
+#define TD_TOWER_DMG 20
 #define TD_TOWER_FIRE_RATE 3
 
 struct Agents {
