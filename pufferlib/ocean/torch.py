@@ -112,8 +112,7 @@ class TowerDefense(nn.Module):
         )
         self.num_actions = int(env.single_action_space.n)
         self.actor = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, self.num_actions), std=0.01)
-        self.value = pufferlib.pytorch.layer_init(
-                nn.Linear(hidden_size, 1), std=1)
+        self.value = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, 1), std=1)
 
     def forward(self, observations, state=None):
         hidden = self.encode_observations(observations, state)
