@@ -32,7 +32,7 @@
 #define TD_TOWER_DMG 20
 #define TD_TOWER_FIRE_RATE 3
 
-struct Agents {
+struct Agent {
     int x, y;
     int hp;
     int max_hp;
@@ -75,7 +75,7 @@ typedef struct {
     float *returns;
     int *grid;
     int *prev_grid;
-    struct Agents *agents;
+    struct Agent *agents;
     struct Tower towers[TD_MAX_TOWERS];
     struct Home home;
 
@@ -114,7 +114,7 @@ static void compute_observations(TDEnv *env) {
     int w = env->width, h = env->height, wh = w * h;
     int obs_dim = 4 * wh;
     for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *a = &env->agents[i];
+        struct Agent *a = &env->agents[i];
         uint8_t *obs = &env->observations[i * obs_dim];
         if (!a->alive) {
             memset(obs, 0, obs_dim);
@@ -148,7 +148,7 @@ static void compute_observations(TDEnv *env) {
             uint8_t v = 0;
             int x = idx % w, y = idx / w;
             for (int j = 0; j < env->num_agents; j++) {
-                struct Agents *a2 = &env->agents[j];
+                struct Agent *a2 = &env->agents[j];
                 if (a2->alive && a2->x == x && a2->y == y) {
                     v = (uint8_t)a2->hp;
                     break;
@@ -163,10 +163,10 @@ static void compute_observations(TDEnv *env) {
 // Environment lifecycle helpers (init / reset / close)
 // -----------------------------------------------------------------------------
 void init(TDEnv *env) {
-    env->grid = calloc(env->width * env->height, sizeof(int));
-    env->prev_grid = calloc(env->width * env->height, sizeof(int));
-    env->agents = calloc(env->num_agents, sizeof(struct Agents));
-    env->returns = calloc(env->num_agents, sizeof(float));
+    env->grid = (int *)calloc(env->width * env->height, sizeof(int));
+    env->prev_grid = (int *)calloc(env->width * env->height, sizeof(int));
+    env->agents = (struct Agent *)calloc(env->num_agents, sizeof(struct Agent));
+    env->returns = (float *)calloc(env->num_agents, sizeof(float));
     env->log = (Log){0};
 }
 
@@ -203,7 +203,7 @@ void c_reset(TDEnv *env) {
 
     // Agents
     for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *a = &env->agents[i];
+        struct Agent *a = &env->agents[i];
         a->alive = true;
         a->max_hp = (i < env->num_agents / 2 ? TD_AGENT_LOW_HP : TD_AGENT_HIGH_HP);
         a->hp = a->max_hp;
@@ -283,7 +283,7 @@ void c_step(TDEnv *env) {
     int num_alive = 0;
     // Move agents
     for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *e = &env->agents[i];
+        struct Agent *e = &env->agents[i];
         if (!e->alive) continue;
         num_alive++;
 
@@ -340,7 +340,7 @@ void c_step(TDEnv *env) {
 
     // Contact damage
     for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *a = &env->agents[i];
+        struct Agent *a = &env->agents[i];
         if (!a->alive) continue;
         if (abs(a->x - env->home.x) + abs(a->y - env->home.y) == 1) {
             env->home.hp -= TD_AGENT_DMG;
@@ -356,7 +356,7 @@ void c_step(TDEnv *env) {
         if (env->tick - tw->last_fired < TD_TOWER_FIRE_RATE) continue;
         int target = -1, range2 = tw->range * tw->range, best = range2 + 1;
         for (int i = 0; i < env->num_agents; i++) {
-            struct Agents *a = &env->agents[i];
+            struct Agent *a = &env->agents[i];
             if (!a->alive) continue;
             int dx = a->x - tw->x, dy = a->y - tw->y, dist2 = dx * dx + dy * dy;
             if (dist2 <= range2 && check_los(env, tw->x, tw->y, a->x, a->y))
@@ -367,7 +367,7 @@ void c_step(TDEnv *env) {
         }
         if (target >= 0) {
             tw->last_fired = env->tick;
-            struct Agents *a = &env->agents[target];
+            struct Agent *a = &env->agents[target];
             int hp_before = a->hp;
             a->hp -= TD_TOWER_DMG;
             if (a->hp <= 0) {
@@ -394,7 +394,7 @@ typedef struct Client {
 } Client;
 
 static Client *make_client(TDEnv *env) {
-    Client *c = calloc(1, sizeof(Client));
+    Client *c = (Client *)calloc(1, sizeof(Client));
     c->px = 32;
     InitWindow(env->width * c->px, env->height * c->px, "PufferLib TD (optimised)");
     SetTargetFPS(60);
@@ -430,7 +430,7 @@ void c_render(TDEnv *env) {
             DrawRectangle(j * px, i * px, px, px, col);
             if (code == TD_AGENT_LOW || code == TD_AGENT_HIGH) {
                 for (int k = 0; k < env->num_agents; k++) {
-                    struct Agents *e = &env->agents[k];
+                    struct Agent *e = &env->agents[k];
                     if (e->alive && e->x == j && e->y == i) {
                         const char *t = TextFormat("%d", e->hp);
                         int fs = px / 2;
