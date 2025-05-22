@@ -29,7 +29,7 @@ typedef struct Client Client;
 #define TD_HOME_HP 100
 
 #define TD_AGENT_DMG 5
-#define TD_TOWER_DMG 25
+#define TD_TOWER_DMG 15
 #define TD_TOWER_FIRE_RATE 3
 
 struct Agents {
@@ -171,7 +171,6 @@ void c_reset(TDEnv *env) {
     env->towers[2].y = env->height / 2;
     env->towers[2].range = (env->width < env->height ? env->width : env->height) / 4;
     env->towers[2].last_fired = -3;
-
 
     // Place home at bottom center
     env->home.x = env->width / 2;
@@ -465,6 +464,12 @@ void c_render(TDEnv *env) {
                         break;
                     }
                 }
+            }
+            if (code == TD_HOME) {
+                const char *hp_text = TextFormat("%d", env->home.hp);
+                int fontSize = px / 2;
+                int textWidth = MeasureText(hp_text, fontSize);
+                DrawText(hp_text, j * px + (px - textWidth) / 2, i * px + (px - fontSize) / 2, fontSize, WHITE);
             }
         }
     }
