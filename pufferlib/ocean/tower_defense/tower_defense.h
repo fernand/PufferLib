@@ -87,7 +87,7 @@ static void compute_observations(TDEnv *env) {
     int w = env->width;
     int h = env->height;
     int wh = w * h;
-    int obs_dim = wh * 3;
+    int obs_dim = 4 * wh;
     for (int i = 0; i < env->num_agents; i++) {
         struct Agents *a = &env->agents[i];
         float *obs = &env->observations[i * obs_dim];
@@ -117,13 +117,13 @@ static void compute_observations(TDEnv *env) {
                 obs[wh + idx] = 0.0f;
             }
         }
-        // Channel 3: self indicator
+        // Channel 2: self indicator
         for (int idx = 0; idx < wh; idx++) {
             int x = idx % w;
             int y = idx / w;
-            obs[3 * wh + idx] = (a->x == x && a->y == y) ? 1.0f : 0.0f;
+            obs[2 * wh + idx] = (a->x == x && a->y == y) ? 1.0f : 0.0f;
         }
-        // Channel 2: normalized agent HP
+        // Channel 3: normalized agent HP
         for (int idx = 0; idx < wh; idx++) {
             float v = 0.0f;
             int x = idx % w;
@@ -135,7 +135,7 @@ static void compute_observations(TDEnv *env) {
                     break;
                 }
             }
-            obs[2 * wh + idx] = v;
+            obs[3 * wh + idx] = v;
         }
     }
 }

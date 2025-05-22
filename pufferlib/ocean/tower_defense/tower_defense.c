@@ -7,8 +7,8 @@ int main() {
     env.num_agents = 10;
     init(&env);
 
-    // Allocate observations buffer: num_agents x width x height x 4 channels
-    int obs_dim = env.width * env.height * 4;
+    // Allocate observations buffer: num_agents x 4 channels x width x height
+    int obs_dim = 4 * env.width * env.height;
     env.observations = (float *)calloc(env.num_agents * obs_dim, sizeof(float));
     env.actions = (int *)calloc(env.num_agents, sizeof(int));
     env.rewards = (float *)calloc(env.num_agents, sizeof(float));
