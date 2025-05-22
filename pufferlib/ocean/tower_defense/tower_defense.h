@@ -29,7 +29,7 @@
 #define TD_AGENT_HIGH_HP 100
 #define TD_HOME_HP 100
 #define TD_AGENT_DMG 5
-#define TD_TOWER_DMG 40
+#define TD_TOWER_DMG 50
 #define TD_TOWER_FIRE_RATE 3
 
 struct Agent {
@@ -283,11 +283,11 @@ void c_step(TDEnv *env) {
     int num_alive = 0;
     // Move agents
     for (int i = 0; i < env->num_agents; i++) {
-        struct Agent *e = &env->agents[i];
-        if (!e->alive) continue;
+        struct Agent *a = &env->agents[i];
+        if (!a->alive) continue;
         num_alive++;
 
-        int old_x = e->x, old_y = e->y;
+        int old_x = a->x, old_y = a->y;
         int ax = old_x, ay = old_y;
         switch (env->actions[i]) {
             case TD_ACTION_UP:
@@ -314,20 +314,20 @@ void c_step(TDEnv *env) {
         if (occupied) {
             env->rewards[i] += -0.1f;
             env->returns[i] += -0.1f;
-            int code = (e->max_hp <= TD_AGENT_LOW_HP ? TD_AGENT_LOW : TD_AGENT_HIGH);
+            int code = (a->max_hp <= TD_AGENT_LOW_HP ? TD_AGENT_LOW : TD_AGENT_HIGH);
             env->grid[old_y * env->width + old_x] = code;
         } else {
-            int code = (e->max_hp <= TD_AGENT_LOW_HP ? TD_AGENT_LOW : TD_AGENT_HIGH);
+            int code = (a->max_hp <= TD_AGENT_LOW_HP ? TD_AGENT_LOW : TD_AGENT_HIGH);
             env->grid[old_y * env->width + old_x] = TD_EMPTY;
             env->grid[ny * env->width + nx] = code;
-            e->x = nx;
-            e->y = ny;
+            a->x = nx;
+            a->y = ny;
             env->prev_grid[dest_idx] = TD_AGENT_HIGH;  // mark occupied for this step
         }
 
         // Potential‑based shaping (Ng+99)
         float phi_s = potential(old_x, old_y, env);
-        float phi_sp = potential(e->x, e->y, env);
+        float phi_sp = potential(a->x, a->y, env);
         float dense = TD_GAMMA * phi_sp - phi_s;
         env->rewards[i] += dense;
         env->returns[i] += dense;
