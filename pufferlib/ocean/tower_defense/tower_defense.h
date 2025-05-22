@@ -146,12 +146,12 @@ void init(TDEnv *env) {
     env->prev_grid = (int *)calloc(env->width * env->height, sizeof(int));
     env->agents = (struct Agents *)calloc(env->num_agents, sizeof(struct Agents));
     env->returns = (float *)calloc(env->num_agents, sizeof(float));
+    env->log = (Log){0};
 }
 
 // Reset environment state, but do not touch RL-exposed buffers (Python manages them)
 void c_reset(TDEnv *env) {
     env->tick = 0;
-    env->log = (Log){0};
 
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
         env->towers[t].x = 0;
