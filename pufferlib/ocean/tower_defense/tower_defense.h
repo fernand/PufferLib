@@ -21,11 +21,11 @@ typedef struct Client Client;
 #define TD_EMPTY 0
 #define TD_TOWER 1
 #define TD_HOME 2
-#define TD_ENEMY_LOW 3
-#define TD_ENEMY_HIGH 4
+#define TD_AGENT_LOW 3
+#define TD_AGENT_HIGH 4
 
-#define TD_ENEMY_LOW_HP 25
-#define TD_ENEMY_HIGH_HP 100
+#define TD_AGENT_LOW_HP 25
+#define TD_AGENT_HIGH_HP 100
 #define TD_HOME_HP 100
 
 #define TD_AGENT_DMG 5
@@ -188,11 +188,11 @@ void c_reset(TDEnv *env) {
         struct Agents *a = &env->agents[i];
         a->alive = true;
         // Initialize HP and max HP
-        a->max_hp = (i < env->num_agents / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
+        a->max_hp = (i < env->num_agents / 2 ? TD_AGENT_LOW_HP : TD_AGENT_HIGH_HP);
         a->hp = a->max_hp;
         a->x = (i + 1) * env->width / (env->num_agents + 1);
         a->y = env->height - 1;
-        env->grid[a->y * env->width + a->x] = (i < env->num_agents / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+        env->grid[a->y * env->width + a->x] = (i < env->num_agents / 2 ? TD_AGENT_LOW : TD_AGENT_HIGH);
         env->terminals[i] = 0;
     }
     memset(env->returns, 0, env->num_agents * sizeof(float));
@@ -296,23 +296,26 @@ void c_step(TDEnv *env) {
         int nx = clamp(ax, 0, env->width - 1);
         int ny = clamp(ay, 0, env->height - 1);
         bool occupied = false;
+        int dest_idx = ny * env->width + nx;
         if (nx != old_x || ny != old_y) {
-            int code = env->prev_grid[ny * env->width + nx];
+            int code = env->prev_grid[dest_idx];
             if (code != TD_EMPTY) occupied = true;
         }
         if (occupied) {
             env->rewards[i] += -0.1f;
             env->returns[i] += -0.1f;
             // Remain in place and mark on grid
-            int code = (e->max_hp <= TD_ENEMY_LOW_HP ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+            int code = (e->max_hp <= TD_AGENT_LOW_HP ? TD_AGENT_LOW : TD_AGENT_HIGH);
             env->grid[old_y * env->width + old_x] = code;
         } else {
             // Move and update grid
-            int code = (e->max_hp <= TD_ENEMY_LOW_HP ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+            int code = (e->max_hp <= TD_AGENT_LOW_HP ? TD_AGENT_LOW : TD_AGENT_HIGH);
             env->grid[old_y * env->width + old_x] = TD_EMPTY;
             env->grid[ny * env->width + nx] = code;
             e->x = nx;
             e->y = ny;
+            // Mark destination as occupied in prev_grid to prevent other agents from moving here this step
+            env->prev_grid[dest_idx] = TD_AGENT_HIGH_HP; // Use any non-empty value
         }
     }
     if (num_alive == 0) {
@@ -332,7 +335,7 @@ void c_step(TDEnv *env) {
             env->rewards[i] += 0.1f;
         }
     }
-    // Towers each select their closest in-range, line-of-sight enemy and fire once
+    // Towers each select their closest in-range, line-of-sight AGENT and fire once
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
         struct Tower *tw = &env->towers[t];
         if (tw->range <= 0) continue;
@@ -436,10 +439,10 @@ void c_render(TDEnv *env) {
                 case TD_HOME:
                     color = (Color){0, 255, 0, 255};
                     break;
-                case TD_ENEMY_LOW:
+                case TD_AGENT_LOW:
                     color = (Color){255, 165, 0, 255};
                     break;
-                case TD_ENEMY_HIGH:
+                case TD_AGENT_HIGH:
                     color = (Color){255, 0, 0, 255};
                     break;
                 default:
@@ -447,7 +450,7 @@ void c_render(TDEnv *env) {
             }
             DrawRectangle(j * px, i * px, px, px, color);
             // Display agent HP on their rectangle
-            if (code == TD_ENEMY_LOW || code == TD_ENEMY_HIGH) {
+            if (code == TD_AGENT_LOW || code == TD_AGENT_HIGH) {
                 for (int k = 0; k < env->num_agents; k++) {
                     struct Agents *e = &env->agents[k];
                     if (e->alive && e->x == j && e->y == i) {
