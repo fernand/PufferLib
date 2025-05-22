@@ -89,9 +89,9 @@ static void compute_observations(TDEnv *env) {
     int wh = w * h;
     int obs_dim = wh * 3;
     for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *e = &env->agents[i];
+        struct Agents *a = &env->agents[i];
         float *obs = &env->observations[i * obs_dim];
-        if (!e->alive) {
+        if (!a->alive) {
             for (int j = 0; j < obs_dim; j++) obs[j] = 0.0f;
             continue;
         }
@@ -116,6 +116,12 @@ static void compute_observations(TDEnv *env) {
             } else {
                 obs[wh + idx] = 0.0f;
             }
+        }
+        // Channel 3: self indicator
+        for (int idx = 0; idx < wh; idx++) {
+            int x = idx % w;
+            int y = idx / w;
+            obs[3 * wh + idx] = (a->x == x && a->y == y) ? 1.0f : 0.0f;
         }
         // Channel 2: normalized agent HP
         for (int idx = 0; idx < wh; idx++) {
@@ -179,14 +185,14 @@ void c_reset(TDEnv *env) {
     env->home.hp = env->home.max_hp;
 
     for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *e = &env->agents[i];
-        e->alive = true;
+        struct Agents *a = &env->agents[i];
+        a->alive = true;
         // Initialize HP and max HP
-        e->max_hp = (i < env->num_agents / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
-        e->hp = e->max_hp;
-        e->x = (i + 1) * env->width / (env->num_agents + 1);
-        e->y = env->height - 1;
-        env->grid[e->y * env->width + e->x] = (i < env->num_agents / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
+        a->max_hp = (i < env->num_agents / 2 ? TD_ENEMY_LOW_HP : TD_ENEMY_HIGH_HP);
+        a->hp = a->max_hp;
+        a->x = (i + 1) * env->width / (env->num_agents + 1);
+        a->y = env->height - 1;
+        env->grid[a->y * env->width + a->x] = (i < env->num_agents / 2 ? TD_ENEMY_LOW : TD_ENEMY_HIGH);
         env->terminals[i] = 0;
     }
     memset(env->returns, 0, env->num_agents * sizeof(float));
@@ -260,9 +266,9 @@ void c_step(TDEnv *env) {
     memcpy(env->prev_grid, env->grid, total * sizeof(int));
     // Remove dead agents from grid snapshot
     for (int j = 0; j < env->num_agents; j++) {
-        struct Agents *ea = &env->agents[j];
-        if (!ea->alive) {
-            env->prev_grid[ea->y * env->width + ea->x] = TD_EMPTY;
+        struct Agents *a = &env->agents[j];
+        if (!a->alive) {
+            env->prev_grid[a->y * env->width + a->x] = TD_EMPTY;
         }
     }
     int num_alive = 0;
@@ -317,10 +323,10 @@ void c_step(TDEnv *env) {
     }
     // Home damage & reward
     for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *e = &env->agents[i];
-        if (!e->alive) continue;
-        int dx = abs(e->x - env->home.x);
-        int dy = abs(e->y - env->home.y);
+        struct Agents *a = &env->agents[i];
+        if (!a->alive) continue;
+        int dx = abs(a->x - env->home.x);
+        int dy = abs(a->y - env->home.y);
         if (dx + dy == 1) {
             env->home.hp -= TD_AGENT_DMG;
             env->returns[i] += 0.1f;
@@ -336,12 +342,12 @@ void c_step(TDEnv *env) {
         int range2 = tw->range * tw->range;
         int best_dist2 = range2 + 1;
         for (int i = 0; i < env->num_agents; i++) {
-            struct Agents *e = &env->agents[i];
-            if (!e->alive) continue;
-            int dx = e->x - tw->x;
-            int dy = e->y - tw->y;
+            struct Agents *a = &env->agents[i];
+            if (!a->alive) continue;
+            int dx = a->x - tw->x;
+            int dy = a->y - tw->y;
             int dist2 = dx * dx + dy * dy;
-            if (dist2 <= range2 && check_los(env, tw->x, tw->y, e->x, e->y)) {
+            if (dist2 <= range2 && check_los(env, tw->x, tw->y, a->x, a->y)) {
                 if (dist2 < best_dist2) {
                     best_dist2 = dist2;
                     target = i;
@@ -350,10 +356,10 @@ void c_step(TDEnv *env) {
         }
         if (target >= 0) {
             tw->last_fired = env->tick;
-            struct Agents *e = &env->agents[target];
-            e->hp -= TD_TOWER_DMG;
-            if (e->hp <= 0) {
-                e->alive = false;
+            struct Agents *a = &env->agents[target];
+            a->hp -= TD_TOWER_DMG;
+            if (a->hp <= 0) {
+                a->alive = false;
                 env->terminals[target] = 1;
                 env->returns[target] += -1.0f;
                 env->rewards[target] += -1.0f;
@@ -367,10 +373,10 @@ void c_step(TDEnv *env) {
         int max_dist = max_dx + max_dy;
         int denom = max_dist > 1 ? (max_dist - 1) : 1;
         for (int i = 0; i < env->num_agents; i++) {
-            struct Agents *e = &env->agents[i];
-            if (!e->alive) continue;
-            int dx = abs(e->x - env->home.x);
-            int dy = abs(e->y - env->home.y);
+            struct Agents *a = &env->agents[i];
+            if (!a->alive) continue;
+            int dx = abs(a->x - env->home.x);
+            int dy = abs(a->y - env->home.y);
             int dist = dx + dy;
             float shaping = ((float)(max_dist - dist) / (float)denom) * 0.2f;
             if (dist <= 1) shaping = 0.2f;
