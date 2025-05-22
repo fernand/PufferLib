@@ -5,11 +5,11 @@ import pufferlib
 from pufferlib.ocean.tower_defense import binding
 
 class TowerDefense(pufferlib.PufferEnv):
-    def __init__(self, num_envs=1, num_agents=10, width=30, height=30,
+    def __init__(self, num_envs=1, num_agents=8, width=30, height=30,
                  render_mode=None, log_interval=1, buf=None, seed=42):
         # Define native spaces
         self.single_observation_space = gymnasium.spaces.Box(
-            low=0.0, high=1.0, shape=(4 * width * height,), dtype=np.float32)
+            low=0, high=255, shape=(4 * width * height,), dtype=np.uint8)
         self.single_action_space = gymnasium.spaces.Discrete(5)
         self.render_mode = render_mode
         # Total number of agents across all envs

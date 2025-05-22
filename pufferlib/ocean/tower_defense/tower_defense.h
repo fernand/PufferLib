@@ -60,7 +60,7 @@ struct Log {
 
 typedef struct {
     // RL-exposed buffers (set by Python, not allocated here)
-    float *observations;   // size: num_agents * TD_OBS_DIM
+    uint8_t *observations;   // size: num_agents * TD_OBS_DIM
     int *actions;          // size: num_agents
     float *rewards;        // size: num_agents
     float *returns;        // size: num_agents
@@ -90,48 +90,48 @@ static void compute_observations(TDEnv *env) {
     int obs_dim = 4 * wh;
     for (int i = 0; i < env->num_agents; i++) {
         struct Agents *a = &env->agents[i];
-        float *obs = &env->observations[i * obs_dim];
+        uint8_t *obs = &env->observations[i * obs_dim];
         if (!a->alive) {
-            for (int j = 0; j < obs_dim; j++) obs[j] = 0.0f;
+            for (int j = 0; j < obs_dim; j++) obs[j] = 0;
             continue;
         }
         // Channel 0: home
         for (int idx = 0; idx < wh; idx++) {
-            obs[idx] = (env->grid[idx] == TD_HOME) ? 1.0f : 0.0f;
+            obs[idx] = (env->grid[idx] == TD_HOME) ? 255 : 0;
         }
-        // Channel 1: towers (0.5 if not firing, 1.0 if firing)
+        // Channel 1: towers (128 if not firing, 255 if firing)
         for (int idx = 0; idx < wh; idx++) {
             if (env->grid[idx] == TD_TOWER) {
                 int x = idx % w;
                 int y = idx / w;
-                float v = 0.5f;
+                uint8_t v = 128;
                 for (int t = 0; t < TD_MAX_TOWERS; t++) {
                     struct Tower *tw = &env->towers[t];
                     if (tw->range > 0 && tw->x == x && tw->y == y) {
-                        if (tw->last_fired == env->tick) v = 1.0f;
+                        if (tw->last_fired == env->tick) v = 255;
                         break;
                     }
                 }
                 obs[wh + idx] = v;
             } else {
-                obs[wh + idx] = 0.0f;
+                obs[wh + idx] = 0;
             }
         }
         // Channel 2: self indicator
         for (int idx = 0; idx < wh; idx++) {
             int x = idx % w;
             int y = idx / w;
-            obs[2 * wh + idx] = (a->x == x && a->y == y) ? 1.0f : 0.0f;
+            obs[2 * wh + idx] = (a->x == x && a->y == y) ? 255 : 0;
         }
-        // Channel 3: normalized agent HP
+        // Channel 3: agent HP
         for (int idx = 0; idx < wh; idx++) {
-            float v = 0.0f;
+            uint8_t v;
             int x = idx % w;
             int y = idx / w;
             for (int j = 0; j < env->num_agents; j++) {
                 struct Agents *a2 = &env->agents[j];
                 if (a2->alive && a2->x == x && a2->y == y) {
-                    v = (float)a2->hp / (float)TD_ENEMY_HIGH_HP;
+                    v = (uint8_t)a2->hp;
                     break;
                 }
             }

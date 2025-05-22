@@ -89,6 +89,56 @@ class NMMO3(nn.Module):
         value = self.value_fn(flat_hidden)
         return action, value
 
+class TowerDefense(nn.Module):
+    def __init__(self, env, cnn_channels=32, hidden_size=128, **kwargs):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.is_continuous = False
+
+        self.net_2d = nn.Sequential(
+            pufferlib.pytorch.layer_init(
+                nn.Conv2d(4, 16, 3, stride=1)),
+            nn.ReLU(),
+            pufferlib.pytorch.layer_init(
+                nn.Conv2d(16, cnn_channels, 3, stride=2)),
+            nn.ReLU(),
+            pufferlib.pytorch.layer_init(
+                nn.Conv2d(cnn_channels, cnn_channels, 3, stride=2)),
+            nn.ReLU(),
+            pufferlib.pytorch.layer_init(
+                nn.Conv2d(cnn_channels, cnn_channels, 3, stride=2)),
+            nn.ReLU(),
+            nn.Flatten(),
+        )
+        # 4 * cnn_channels == hidden_size
+        self.proj = nn.Sequential(
+            pufferlib.pytorch.layer_init(nn.Linear(hidden_size, hidden_size)),
+            nn.ReLU(),
+        )
+        self.actor = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, 5), std=0.01)
+        self.value = pufferlib.pytorch.layer_init(
+                nn.Linear(hidden_size, 1), std=1)
+
+    def forward(self, observations, state=None):
+        hidden = self.encode_observations(observations, state)
+        actions, value = self.decode_actions(hidden)
+        return actions, value
+
+    def forward_train(self, x, state=None):
+        return self.forward(x, state)
+
+    def encode_observations(self, observations, state=None):
+        obs_2d = observations.reshape(-1, 4, 30, 30).float() / 255.0
+        cnn_out = self.net_2d(obs_2d)
+        return self.proj(cnn_out)
+
+    def decode_actions(self, hidden):
+        action = self.actor(hidden)
+        print(action.shape)
+        action = torch.split(action, 5, dim=1)
+        value = self.value(hidden)
+        return action, value
+
 class Terraform(nn.Module):
     def __init__(self, env, cnn_channels=32, hidden_size=128, **kwargs):
         super().__init__()

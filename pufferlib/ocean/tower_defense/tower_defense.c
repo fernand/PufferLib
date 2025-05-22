@@ -4,12 +4,12 @@ int main() {
     TDEnv env;
     env.width = 30;
     env.height = 30;
-    env.num_agents = 10;
+    env.num_agents = 8;
     init(&env);
 
     // Allocate observations buffer: num_agents x 4 channels x width x height
     int obs_dim = 4 * env.width * env.height;
-    env.observations = (float *)calloc(env.num_agents * obs_dim, sizeof(float));
+    env.observations = (uint8_t *)calloc(env.num_agents * obs_dim, sizeof(float));
     env.actions = (int *)calloc(env.num_agents, sizeof(int));
     env.rewards = (float *)calloc(env.num_agents, sizeof(float));
     env.terminals = (uint8_t *)calloc(env.num_agents, sizeof(uint8_t));
@@ -20,7 +20,7 @@ int main() {
     c_reset(&env);
     c_render(&env);
 
-    int agent_idx = 9;
+    int agent_idx = 7;
     bool key_processed = false;
     while (!WindowShouldClose()) {
         // Handle input for the agent: one action per key press
