@@ -63,7 +63,6 @@ typedef struct {
     uint8_t *observations;   // size: num_agents * TD_OBS_DIM
     int *actions;          // size: num_agents
     float *rewards;        // size: num_agents
-    float *returns;        // size: num_agents
     uint8_t *terminals;    // size: num_agents
     uint8_t *truncations;  // size: num_agents (optional, can be NULL)
 
@@ -76,6 +75,7 @@ typedef struct {
     Log log;
     Client *client;
 
+    float *returns; // size: num_agents
     int *grid;
     int *prev_grid;
     struct Agents *agents;
@@ -125,7 +125,7 @@ static void compute_observations(TDEnv *env) {
         }
         // Channel 3: agent HP
         for (int idx = 0; idx < wh; idx++) {
-            uint8_t v;
+            uint8_t v = 0;
             int x = idx % w;
             int y = idx / w;
             for (int j = 0; j < env->num_agents; j++) {
@@ -245,20 +245,20 @@ void c_step(TDEnv *env) {
             env->terminals[i] = 1;
             env->returns[i] += -1.0f;
             env->rewards[i] += -1.0f;
-            add_log(env);
-            c_reset(env);
-            return;
         }
+        add_log(env);
+        c_reset(env);
+        return;
     }
     if (env->home.hp <= 0) {
         for (int i = 0; i < env->num_agents; i++) {
             env->terminals[i] = 1;
             env->returns[i] += 1.0f;
             env->rewards[i] += 1.0f;
-            add_log(env);
-            c_reset(env);
-            return;
         }
+        add_log(env);
+        c_reset(env);
+        return;
     }
     memset(env->rewards, 0, env->num_agents * sizeof(float));
     memset(env->terminals, 0, env->num_agents * sizeof(uint8_t));
@@ -279,10 +279,10 @@ void c_step(TDEnv *env) {
         int ax = old_x, ay = old_y;
         switch (env->actions[i]) {
             case TD_ACTION_UP:
-                ay++;
+                ay--;
                 break;
             case TD_ACTION_DOWN:
-                ay--;
+                ay++;
                 break;
             case TD_ACTION_LEFT:
                 ax--;
@@ -359,6 +359,7 @@ void c_step(TDEnv *env) {
             a->hp -= TD_TOWER_DMG;
             if (a->hp <= 0) {
                 a->alive = false;
+                env->grid[a->y * env->width + a->x] = TD_EMPTY;
                 env->terminals[target] = 1;
                 env->returns[target] += -1.0f;
                 env->rewards[target] += -1.0f;
@@ -392,6 +393,7 @@ void c_close(TDEnv *env) {
     free(env->grid);
     free(env->prev_grid);
     free(env->agents);
+    free(env->returns);
 }
 
 struct Client {
