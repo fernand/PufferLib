@@ -142,13 +142,16 @@ static void compute_observations(TDEnv *env) {
 
 // Called by env_init via my_init: allocates internal state and sets up env
 void init(TDEnv *env) {
-    env->tick = 0;
-    memset(&env->log, 0, sizeof(env->log));
-
     env->grid = (int *)calloc(env->width * env->height, sizeof(int));
     env->prev_grid = (int *)calloc(env->width * env->height, sizeof(int));
     env->agents = (struct Agents *)calloc(env->num_agents, sizeof(struct Agents));
     env->returns = (float *)calloc(env->num_agents, sizeof(float));
+}
+
+// Reset environment state, but do not touch RL-exposed buffers (Python manages them)
+void c_reset(TDEnv *env) {
+    env->tick = 0;
+    memset(&env->log, 0, sizeof(env->log));
 
     // Place first tower at center, disable others
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
@@ -170,10 +173,7 @@ void init(TDEnv *env) {
     env->home.y = 0;
     env->home.max_hp = TD_HOME_HP;
     env->home.hp = env->home.max_hp;
-}
 
-// Reset environment state, but do not touch RL-exposed buffers (Python manages them)
-void c_reset(TDEnv *env) {
     memset(env->grid, TD_EMPTY, env->width * env->height * sizeof(int));
     // Place all towers
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
@@ -315,7 +315,7 @@ void c_step(TDEnv *env) {
             e->x = nx;
             e->y = ny;
             // Mark destination as occupied in prev_grid to prevent other agents from moving here this step
-            env->prev_grid[dest_idx] = TD_AGENT_HIGH_HP; // Use any non-empty value
+            env->prev_grid[dest_idx] = TD_AGENT_HIGH; // Use any non-empty value
         }
     }
     if (num_alive == 0) {
