@@ -210,12 +210,11 @@ void c_reset(TDEnv *env) {
 
 void add_log(TDEnv *env) {
     for (int i = 0; i < env->num_agents; i++) {
-        env->log.perf += env->rewards[i];
-        env->log.score += env->returns[i];
-        env->log.episode_length += env->tick;
-        env->log.episode_return += env->returns[i];
-        env->log.n++;
+        env->log.perf += env->rewards[i] / env->num_agents;
+        env->log.score += env->returns[i] / env->num_agents;
     }
+    env->log.n++;
+    env->log.episode_length += env->tick;
 }
 
 static inline int clamp(int v, int mn, int mx) { return v < mn ? mn : (v > mx ? mx : v); }
