@@ -151,22 +151,27 @@ void init(TDEnv *env) {
 // Reset environment state, but do not touch RL-exposed buffers (Python manages them)
 void c_reset(TDEnv *env) {
     env->tick = 0;
-    memset(&env->log, 0, sizeof(env->log));
+    env->log = (Log){0};
 
-    // Place first tower at center, disable others
     for (int t = 0; t < TD_MAX_TOWERS; t++) {
-        if (t == 0) {
-            env->towers[t].x = env->width / 2;
-            env->towers[t].y = env->height / 2;
-            env->towers[t].range = (env->width < env->height ? env->width : env->height) / 4;
-            env->towers[t].last_fired = -3;
-        } else {
-            env->towers[t].x = 0;
-            env->towers[t].y = 0;
-            env->towers[t].range = 0;
-            env->towers[t].last_fired = -1;
-        }
+        env->towers[t].x = 0;
+        env->towers[t].y = 0;
+        env->towers[t].range = 0;
+        env->towers[t].last_fired = -1;
     }
+    env->towers[0].x = env->width / 2;
+    env->towers[0].y = env->height / 2;
+    env->towers[0].range = (env->width < env->height ? env->width : env->height) / 4;
+    env->towers[0].last_fired = -3;
+    env->towers[1].x = env->width - 1;
+    env->towers[1].y = env->height / 2;
+    env->towers[1].range = (env->width < env->height ? env->width : env->height) / 4;
+    env->towers[1].last_fired = -3;
+    env->towers[2].x = 0;
+    env->towers[2].y = env->height / 2;
+    env->towers[2].range = (env->width < env->height ? env->width : env->height) / 4;
+    env->towers[2].last_fired = -3;
+
 
     // Place home at bottom center
     env->home.x = env->width / 2;
