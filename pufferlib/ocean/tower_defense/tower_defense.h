@@ -262,8 +262,7 @@ void c_step(TDEnv *env) {
     }
     memset(env->rewards, 0, env->num_agents * sizeof(float));
     memset(env->terminals, 0, env->num_agents * sizeof(uint8_t));
-    int total = env->width * env->height;
-    memcpy(env->prev_grid, env->grid, total * sizeof(int));
+    memcpy(env->prev_grid, env->grid, env->width * env->height * sizeof(int));
     // Remove dead agents from grid snapshot
     for (int j = 0; j < env->num_agents; j++) {
         struct Agents *a = &env->agents[j];
