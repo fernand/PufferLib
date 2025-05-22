@@ -184,11 +184,11 @@ void c_reset(TDEnv *env) {
     // Towers
     for (int t = 0; t < TD_MAX_TOWERS; t++) env->towers[t] = (struct Tower){0};
     env->towers[0] = (struct Tower){env->width / 2, env->height / 2,
-                                    (env->width < env->height ? env->width : env->height) / 4, -3};
+                                    (env->width < env->height ? env->width : env->height) / 3, -3};
     env->towers[1] = (struct Tower){env->width - 1, env->height / 2,
-                                    (env->width < env->height ? env->width : env->height) / 4, -3};
+                                    (env->width < env->height ? env->width : env->height) / 3, -3};
     env->towers[2] = (struct Tower){0, env->height / 2,
-                                    (env->width < env->height ? env->width : env->height) / 4, -3};
+                                    (env->width < env->height ? env->width : env->height) / 3, -3};
 
     // Home
     env->home = (struct Home){env->width / 2, 0, TD_HOME_HP, TD_HOME_HP};
