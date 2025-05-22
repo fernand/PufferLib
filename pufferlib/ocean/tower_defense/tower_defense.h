@@ -241,7 +241,7 @@ void c_step(TDEnv *env) {
         env->returns[i] += TD_STEP_COST;
     }
 
-    // Episode termination: timeout
+    // Defeat via timeout
     if (env->tick > MAX_TICK) {
         float team_r = -1.0f;
         for (int i = 0; i < env->num_agents; i++) {
@@ -332,6 +332,8 @@ void c_step(TDEnv *env) {
         env->rewards[i] += dense;
         env->returns[i] += dense;
     }
+
+    // Defeat
     if (num_alive == 0) {
         add_log(env);
         c_reset(env);
