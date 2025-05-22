@@ -110,11 +110,7 @@ class TowerDefense(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
         )
-        self.proj = nn.Sequential(
-            pufferlib.pytorch.layer_init(nn.Linear(hidden_size, hidden_size)),
-            nn.ReLU(),
-        )
-        self.num_actions = env.single_action_space.n
+        self.num_actions = int(env.single_action_space.n)
         self.actor = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, self.num_actions), std=0.01)
         self.value = pufferlib.pytorch.layer_init(
                 nn.Linear(hidden_size, 1), std=1)
@@ -129,12 +125,10 @@ class TowerDefense(nn.Module):
 
     def encode_observations(self, observations, state=None):
         obs_2d = observations.reshape(-1, 4, 30, 30).float() / 255.0
-        cnn_out = self.net_2d(obs_2d)
-        return self.proj(cnn_out)
+        return self.net_2d(obs_2d)
 
     def decode_actions(self, hidden):
         action = self.actor(hidden)
-        action = torch.split(action, self.num_actions, dim=1)
         value = self.value(hidden)
         return action, value
 
