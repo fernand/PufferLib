@@ -12,13 +12,6 @@ typedef struct Client Client;
 #define TD_MAX_TOWERS 5
 #define MAX_TICK 50
 
-// Observation dimension:
-// x, y, hp_norm,
-// home_dx, home_dy, home_hp_norm,
-// tower_dx, tower_dy (for each tower, up to TD_MAX_TOWERS),
-// plus all agents' relative positions (dx, dy) and health (3 features per agent)
-#define TD_OBS_DIM (6 + 2 * TD_MAX_TOWERS + TD_MAX_AGENTS * 3)
-
 #define TD_ACTION_NONE 0
 #define TD_ACTION_UP 1
 #define TD_ACTION_DOWN 2
@@ -83,12 +76,63 @@ typedef struct {
     Log log;
     Client *client;
 
-    int *grid;  // size: width*height, holds entity codes
+    int *grid;
     int *prev_grid;
     struct Agents *agents;
     struct Tower towers[TD_MAX_TOWERS];
     struct Home home;
 } TDEnv;
+
+static void compute_observations(TDEnv *env) {
+    int w = env->width;
+    int h = env->height;
+    int wh = w * h;
+    int obs_dim = wh * 3;
+    for (int i = 0; i < env->num_agents; i++) {
+        struct Agents *e = &env->agents[i];
+        float *obs = &env->observations[i * obs_dim];
+        if (!e->alive) {
+            for (int j = 0; j < obs_dim; j++) obs[j] = 0.0f;
+            continue;
+        }
+        // Channel 0: home
+        for (int idx = 0; idx < wh; idx++) {
+            obs[idx] = (env->grid[idx] == TD_HOME) ? 1.0f : 0.0f;
+        }
+        // Channel 1: towers (0.5 if not firing, 1.0 if firing)
+        for (int idx = 0; idx < wh; idx++) {
+            if (env->grid[idx] == TD_TOWER) {
+                int x = idx % w;
+                int y = idx / w;
+                float v = 0.5f;
+                for (int t = 0; t < TD_MAX_TOWERS; t++) {
+                    struct Tower *tw = &env->towers[t];
+                    if (tw->range > 0 && tw->x == x && tw->y == y) {
+                        if (tw->last_fired == env->tick) v = 1.0f;
+                        break;
+                    }
+                }
+                obs[wh + idx] = v;
+            } else {
+                obs[wh + idx] = 0.0f;
+            }
+        }
+        // Channel 2: normalized agent HP
+        for (int idx = 0; idx < wh; idx++) {
+            float v = 0.0f;
+            int x = idx % w;
+            int y = idx / w;
+            for (int j = 0; j < env->num_agents; j++) {
+                struct Agents *e2 = &env->agents[j];
+                if (e2->alive && e2->x == x && e2->y == y) {
+                    v = (float)e2->hp / (float)TD_ENEMY_HIGH_HP;
+                    break;
+                }
+            }
+            obs[2 * wh + idx] = v;
+        }
+    }
+}
 
 // Called by env_init via my_init: allocates internal state and sets up env
 void init(TDEnv *env) {
@@ -150,7 +194,7 @@ void c_reset(TDEnv *env) {
     if (env->truncations) {
         memset(env->truncations, 0, env->num_agents * sizeof(uint8_t));
     }
-    // Observations will be filled in c_step
+    compute_observations(env);
 }
 
 void add_log(TDEnv *env) {
@@ -336,47 +380,7 @@ void c_step(TDEnv *env) {
             env->returns[i] += shaping;
         }
     }
-    // Compute observations
-    for (int i = 0; i < env->num_agents; i++) {
-        struct Agents *e = &env->agents[i];
-        float *obs = &env->observations[i * TD_OBS_DIM];
-        if (!e->alive) {
-            for (int j = 0; j < TD_OBS_DIM; j++) obs[j] = 0.0f;
-            continue;
-        }
-        obs[0] = (float)e->x / (env->width - 1);
-        obs[1] = (float)e->y / (env->height - 1);
-        obs[2] = (float)e->hp / TD_ENEMY_HIGH_HP;
-        obs[3] = (float)(env->home.x - e->x) / env->width;
-        obs[4] = (float)(env->home.y - e->y) / env->height;
-        obs[5] = (float)env->home.hp / env->home.max_hp;
-        // Include towers' relative positions (dx, dy)
-        for (int t = 0; t < TD_MAX_TOWERS; t++) {
-            int off = 6 + t * 2;
-            struct Tower *tw = &env->towers[t];
-            if (tw->range > 0) {
-                obs[off] = (float)(tw->x - e->x) / env->width;
-                obs[off + 1] = (float)(tw->y - e->y) / env->height;
-            } else {
-                obs[off] = obs[off + 1] = 0.0f;
-            }
-        }
-        // Include all agents' relative positions and normalized health
-        for (int j = 0; j < TD_MAX_AGENTS; j++) {
-            int idx_off = 6 + 2 * TD_MAX_TOWERS + j * 3;
-            if (j < env->num_agents && env->agents[j].alive) {
-                struct Agents *e2 = &env->agents[j];
-                float dx = (float)(e2->x - e->x) / env->width;
-                float dy = (float)(e2->y - e->y) / env->height;
-                float hp_norm = (float)e2->hp / TD_ENEMY_HIGH_HP;
-                obs[idx_off] = dx;
-                obs[idx_off + 1] = dy;
-                obs[idx_off + 2] = hp_norm;
-            } else {
-                obs[idx_off] = obs[idx_off + 1] = obs[idx_off + 2] = 0.0f;
-            }
-        }
-    }
+    compute_observations(env);
 }
 
 void c_close(TDEnv *env) {

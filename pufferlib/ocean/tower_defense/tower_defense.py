@@ -4,15 +4,13 @@ import numpy as np
 import pufferlib
 from pufferlib.ocean.tower_defense import binding
 
-# Observation dimension: 6 + 2*TD_MAX_TOWERS + 3*TD_MAX_AGENTS = 46
-OBS_DIM = 6 + 2 * 5 + 3 * 10
-
 class TowerDefense(pufferlib.PufferEnv):
     def __init__(self, num_envs=1, num_agents=10, width=30, height=30,
                  render_mode=None, log_interval=1, buf=None, seed=42):
         # Define native spaces
+        obs_dim = width * height * 3
         self.single_observation_space = gymnasium.spaces.Box(
-            low=-1.0, high=1.0, shape=(OBS_DIM,), dtype=np.float32)
+            low=0.0, high=1.0, shape=(obs_dim,), dtype=np.float32)
         self.single_action_space = gymnasium.spaces.Discrete(5)
         self.render_mode = render_mode
         # Total number of agents across all envs
