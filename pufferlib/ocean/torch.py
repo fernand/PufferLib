@@ -130,22 +130,22 @@ class TowerDefense(nn.Module):
 
         self.net_2d = nn.Sequential(
             pufferlib.pytorch.layer_init(
-                nn.Conv2d(4, 16, 3, stride=1)),
-            nn.ReLU(),
+                nn.Conv2d(4, 16, 3, stride=1, bias=False)),
+            nn.ReLU(inplace=True),
             pufferlib.pytorch.layer_init(
-                nn.Conv2d(16, cnn_channels, 3, stride=2)),
-            nn.ReLU(),
+                nn.Conv2d(16, cnn_channels, 3, stride=2, bias=False)),
+            nn.ReLU(inplace=True),
             pufferlib.pytorch.layer_init(
-                nn.Conv2d(cnn_channels, cnn_channels, 3, stride=2)),
-            nn.ReLU(),
+                nn.Conv2d(cnn_channels, cnn_channels, 3, stride=2, bias=False)),
+            nn.ReLU(inplace=True),
             pufferlib.pytorch.layer_init(
-                nn.Conv2d(cnn_channels, cnn_channels, 3, stride=2)),
-            nn.ReLU(),
+                nn.Conv2d(cnn_channels, cnn_channels, 3, stride=2, bias=False)),
+            nn.ReLU(inplace=True),
             nn.Flatten(),
         )
         self.num_actions = int(env.single_action_space.n)
-        self.actor = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, self.num_actions), std=0.01)
-        self.value = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, 1), std=1)
+        self.actor = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, self.num_actions, bias=False), std=0.01)
+        self.value = pufferlib.pytorch.layer_init(nn.Linear(hidden_size, 1, bias=False), std=1)
 
     def forward(self, observations, state=None):
         hidden = self.encode_observations(observations, state)
