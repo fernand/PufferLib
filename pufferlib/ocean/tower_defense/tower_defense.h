@@ -7,7 +7,7 @@
 
 #define TD_MAX_AGENTS 10
 #define TD_MAX_TOWERS 5
-#define MAX_TICK 75
+#define MAX_TICK 64
 #define TD_GAMMA 0.99f        // discount used in PBRS
 #define TD_STEP_COST -0.001f  // small per‑step pressure
 
