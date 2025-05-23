@@ -2,6 +2,19 @@
 # --no-build-isolation for 5090
 # Make c and torch compile at the same time
 # CUDA_VISIBLE_DEVICES=None LD_PRELOAD=$(gcc -print-file-name=libasan.so) python3.12 -m pufferlib.clean_pufferl eval --train.device cpu
+'''
+Pain points for docs:
+    - Build in C first
+    - Make sure obs types match in C and python
+    - Getting obs and action spaces and types correct
+    - Double check obs are not zero
+    - Correct reset behavior
+    - Make sure rewards look correct
+    - don't forget params/init in binding
+    - Use debug mode to catch segaults
+    - TODO: Add check on num agents vs obs shape!!
+'''
+
 
 from setuptools import find_packages, find_namespace_packages, setup, Extension
 from Cython.Build import cythonize
@@ -208,6 +221,13 @@ environments = {
         # The Magent2 package is broken for now
         #'magent2==0.3.2',
     ],
+    'metta': [
+        f'gym=={GYM_VERSION}',
+        f'gymnasium=={GYMNASIUM_VERSION}',
+        'omegaconf',
+        'hydra-core',
+        'duckdb',
+    ],
     'microrts': [
         f'gym=={GYM_VERSION}',
         f'gymnasium=={GYMNASIUM_VERSION}',
@@ -372,6 +392,24 @@ extension_kwargs = dict(
     extra_link_args=extra_link_args,
     extra_objects=[RAYLIB_A],
 )
+
+# Put C env names here. PufferLib will look for
+# pufferlib/ocean/<name>/binding.c
+c_extensions_names = [
+    'gpudrive',
+    'squared',
+    'pong',
+    'boids',
+    'breakout',
+    'enduro',
+    'blastar',
+    'grid',
+    'nmmo3',
+    'tactical',
+    'connect4',
+    'go',
+    'cartpole'
+]
 
 # TODO: Include other C files so rebuild is auto?
 c_extension_paths = glob.glob('pufferlib/ocean/**/binding.c', recursive=True)
