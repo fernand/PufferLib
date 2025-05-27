@@ -342,6 +342,7 @@ class Multiprocessing:
                     num_workers, i, w_send_pipes[i], w_recv_pipes[i],
                     self.shm, is_native, seed_i)
             )
+            p.daemon = True
             p.start()
             self.processes.append(p)
 
@@ -349,6 +350,9 @@ class Multiprocessing:
         self.initialized = False
         self.zero_copy = zero_copy
         self.sync_traj = sync_traj
+
+        self.ready_workers = []
+        self.waiting_workers = []
 
     def recv(self):
         recv_precheck(self)
@@ -450,6 +454,17 @@ class Multiprocessing:
         self.buf['semaphores'][idxs] = STEP
 
     def async_reset(self, seed=0):
+        # Flush any waiting workers
+        while self.waiting_workers:
+            worker = self.waiting_workers.pop(0)
+            sem = self.buf['semaphores'][worker]
+            if sem >= MAIN:
+                self.ready_workers.append(worker)
+                if sem == INFO:
+                    self.recv_pipes[worker].recv()
+            else:
+                self.waiting_workers.append(worker)
+
         self.flag = RECV
         self.prev_env_id = []
         self.flag = RECV
@@ -676,6 +691,7 @@ def make(env_creator_or_creators, env_args=None, env_kwargs=None, backend=Puffer
         if not isinstance(env_args[i], (list, tuple)):
             raise pufferlib.APIUsageError('env_args must be a list of lists or tuples')
         if not isinstance(env_kwargs[i], dict):
+            breakpoint()
             raise pufferlib.APIUsageError('env_kwargs must be a list of dictionaries')
 
     # Keeps batch size consistent when debugging with Serial backend
