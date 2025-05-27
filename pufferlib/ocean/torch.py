@@ -123,7 +123,7 @@ class NMMO3(nn.Module):
         return action, value
 
 class TowerDefense(nn.Module):
-    def __init__(self, env, cnn_channels=16, hidden_size=128, **kwargs):
+    def __init__(self, env, cnn_channels=32, hidden_size=128, **kwargs):
         super().__init__()
         self.hidden_size = hidden_size
         self.is_continuous = False
