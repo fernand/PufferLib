@@ -852,7 +852,7 @@ def train(env_name, args=None, vecenv=None, policy=None, logger=None):
     # rollouts within a fixed number of epochs)
     i = 0
     stats = {}
-    while i < 32 or not stats:
+    while i < 1 or not stats:
         stats = pufferl.evaluate()
         i += 1
 
@@ -920,7 +920,7 @@ def eval(env_name, args=None, vecenv=None, policy=None):
             frames.append('Done')
 
 def sweep(args=None, env_name=None):
-    args = args or load_config()
+    args = args or load_config(env_name)
     if not args['wandb'] and not args['neptune']:
         raise pufferlib.APIUsageError('Sweeps require either wandb or neptune')
 
@@ -939,11 +939,11 @@ def sweep(args=None, env_name=None):
         torch.manual_seed(seed)
         sweep.suggest(args)
         total_timesteps = args['train']['total_timesteps']
-        all_logs = train(args, env_name=env_name)
+        all_logs = train(env_name, args)
         all_logs = [e for e in all_logs if target_key in e]
-        scores = downsample_alt([log[target_key] for log in all_logs], 10)
-        costs = downsample_alt([log['uptime'] for log in all_logs], 10)
-        timesteps = downsample_alt([log['agent_steps'] for log in all_logs], 10)
+        scores = [log[target_key] for log in all_logs]
+        costs = [log['uptime'] for log in all_logs]
+        timesteps = [log['agent_steps'] for log in all_logs]
 
         for score, cost, timestep in zip(scores, costs, timesteps):
             args['train']['total_timesteps'] = timestep
