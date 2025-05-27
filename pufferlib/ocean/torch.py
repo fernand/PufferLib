@@ -123,17 +123,17 @@ class NMMO3(nn.Module):
         return action, value
 
 class TowerDefense(nn.Module):
-    def __init__(self, env, cnn_channels=32, hidden_size=128, **kwargs):
+    def __init__(self, env, cnn_channels=16, hidden_size=128, **kwargs):
         super().__init__()
         self.hidden_size = hidden_size
         self.is_continuous = False
 
         self.net_2d = nn.Sequential(
             pufferlib.pytorch.layer_init(
-                nn.Conv2d(4, 16, 3, stride=1, bias=False)),
+                nn.Conv2d(4, cnn_channels // 2, 3, stride=1, bias=False)),
             nn.ReLU(inplace=True),
             pufferlib.pytorch.layer_init(
-                nn.Conv2d(16, cnn_channels, 3, stride=2, bias=False)),
+                nn.Conv2d(cnn_channels // 2, cnn_channels, 3, stride=2, bias=False)),
             nn.ReLU(inplace=True),
             pufferlib.pytorch.layer_init(
                 nn.Conv2d(cnn_channels, cnn_channels, 3, stride=2, bias=False)),
